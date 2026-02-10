@@ -1,0 +1,6 @@
+.vercel
+.vercel_build_output
+node_modules
+.DS_Store
+demo_deploy
+*.log

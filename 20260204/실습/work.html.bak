@@ -1,0 +1,1201 @@
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Map</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #FDFDFD;
+            color: #111111;
+            overflow-x: hidden;
+            letter-spacing: -0.02em;
+        }
+
+        /* --- [핵심] 블러 처리 로직 (수정됨) --- */
+
+        /* 1. 기본 상태: 모든 노드는 선명함 */
+        .node-wrapper {
+            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            opacity: 1;
+            filter: blur(0px);
+            transform: scale(1);
+        }
+
+        /* 2. 컨테이너가 '집중 모드(focus-mode)'가 되면 -> 모든 노드를 일단 흐리게 만듦 */
+        #nodesContainer.focus-mode .node-wrapper {
+            opacity: 0.35;
+            filter: blur(1.5px);
+            transform: scale(0.98);
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+        }
+
+        /* 2-1. (신규) 집중 모드여도 마우스 올리면 선명하게 보임 (다른 스텝 탐색용) */
+        #nodesContainer.focus-mode .node-wrapper:hover {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1);
+        }
+
+        /* 3. 그 중에서 'active' 클래스가 붙은 놈만 -> 선명하게 복구 */
+        #nodesContainer.focus-mode .node-wrapper.active {
+            opacity: 1 !important;
+            filter: blur(0px) !important;
+            transform: scale(1.1) !important;
+            pointer-events: auto;
+            z-index: 50;
+        }
+
+        /* 화살표도 집중 모드일 땐 숨김 */
+        .arrow-icon {
+            transition: opacity 0.3s;
+            opacity: 1;
+        }
+
+        #nodesContainer.focus-mode .arrow-icon {
+            opacity: 0;
+        }
+
+
+        /* 기타 UI 스타일 */
+        .input-bar {
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s ease;
+        }
+
+        .input-bar:focus-within {
+            border-color: #000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .btn-black {
+            background-color: #111;
+            color: #fff;
+            transition: transform 0.1s ease, background-color 0.2s;
+        }
+
+        .btn-black:hover {
+            background-color: #000;
+        }
+
+        .btn-black:active {
+            transform: scale(0.96);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.8s cubic-bezier(0.2, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .loader {
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 0.3;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+
+        /* Mindmap Styles */
+        @keyframes drawLine {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @keyframes mindmapNodeAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .mindmap-svg {
+            width: 100%;
+            max-width: 1600px;
+            margin: 0 auto;
+            display: block;
+            overflow: visible;
+        }
+
+        .mindmap-node-g {
+            transform-box: fill-box;
+            transform-origin: center;
+            cursor: pointer;
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .mindmap-node-g:hover {
+            filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.1));
+        }
+
+        /* === Brain Dump + Editable Mindmap === */
+        .detail-split {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            min-height: 500px;
+        }
+        .braindump-panel {
+            flex: 0 0 36%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+        .mm-panel-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+        .braindump-textarea {
+            flex: 1;
+            min-height: 180px;
+            padding: 16px;
+            border: 1px solid #E5E7EB;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.8;
+            resize: none;
+            outline: none;
+            font-family: 'Inter', sans-serif;
+            color: #333;
+            background: #FAFAFA;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .braindump-textarea:focus {
+            border-color: #111;
+            background: #FFF;
+        }
+        .braindump-textarea::placeholder { color: #B0B0B0; }
+        .ai-suggest-box {
+            border: 1px solid #F0F0F0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #FAFBFC;
+        }
+        .suggest-chip {
+            display: inline-block;
+            padding: 5px 11px;
+            margin: 3px;
+            background: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 14px;
+            font-size: 11px;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .suggest-chip:hover {
+            border-color: #3B82F6;
+            color: #2563EB;
+            background: #EFF6FF;
+        }
+        .organize-btn {
+            padding: 12px;
+            background: #111;
+            color: #FFF;
+            border: none;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .organize-btn:hover { background: #000; }
+        .organize-btn:active { transform: scale(0.98); }
+        .organize-btn:disabled { background: #999; cursor: wait; }
+        .mm-canvas-box {
+            flex: 1;
+            border: 1px solid #E5E7EB;
+            border-radius: 12px;
+            background: #FEFEFE;
+            position: relative;
+            overflow: hidden;
+            min-height: 400px;
+        }
+        .mm-empty-state {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #B0B0B0;
+            gap: 8px;
+        }
+        .draft-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #FEF3C7;
+            color: #92400E;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: 5px;
+        }
+        .draft-badge.edited {
+            background: #DCFCE7;
+            color: #166534;
+        }
+        .mm-toolbar-row {
+            display: flex;
+            gap: 6px;
+            padding: 8px;
+            background: #F9FAFB;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+        }
+        .mm-tb-btn {
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 1px solid #E5E7EB;
+            border-radius: 6px;
+            background: #FFF;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #555;
+            font-family: 'Inter', sans-serif;
+        }
+        .mm-tb-btn:hover:not(:disabled) { border-color: #111; color: #111; }
+        .mm-tb-btn:disabled { opacity: 0.3; cursor: default; }
+        .mm-tb-btn.danger:hover:not(:disabled) { border-color: #EF4444; color: #EF4444; }
+        .mm-inline-input {
+            position: absolute;
+            z-index: 100;
+            border: 2px solid #3B82F6;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 13px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            background: white;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            min-width: 120px;
+            text-align: center;
+        }
+        @media (max-width: 768px) {
+            .detail-split { flex-direction: column; }
+            .braindump-panel { flex: none; width: 100%; }
+        }
+    </style>
+</head>
+
+<body class="">
+
+    <main id="app" class="relative w-full flex flex-col items-center">
+
+        <header class="fixed top-0 left-0 w-full px-10 py-10 flex justify-between items-start z-40 pointer-events-none">
+            <div class="text-sm font-bold tracking-tight text-[#111] pointer-events-auto">ARCHIVE.01</div>
+            <!-- Auth Status -->
+            <div id="authStatus" class="pointer-events-auto text-xs font-medium text-gray-400 flex items-center gap-3">
+                <span id="authStatusText">Connected</span>
+                <button onclick="showConfigModal()"
+                    class="hover:text-black underline decoration-dotted transition-colors">Config</button>
+            </div>
+        </header>
+
+        <section id="inputSection"
+            class="w-full h-screen flex flex-col justify-center items-center text-center z-10 transition-all duration-700">
+            <p class="text-[11px] font-bold text-gray-400 tracking-[0.2em] uppercase mb-4 fade-in"
+                style="animation-delay: 0.1s;">Project Initiator</p>
+            <h1 class="text-5xl md:text-6xl font-bold text-[#111] leading-[1.1] tracking-tight mb-12 fade-in"
+                style="animation-delay: 0.2s;">Flow<br>Map</h1>
+
+            <div class="w-full max-w-[440px] relative fade-in" style="animation-delay: 0.3s;">
+                <div class="input-bar w-full h-[60px] rounded-[14px] flex items-center pl-5 pr-1.5 bg-white">
+                    <input type="text" id="topicInput" placeholder="Start a new project..."
+                        class="flex-grow h-full bg-transparent outline-none text-[15px] text-[#111] placeholder-gray-400 font-medium tracking-normal">
+                    <button onclick="handleStart()"
+                        class="h-[48px] px-6 btn-black rounded-[10px] text-[13px] font-bold tracking-wide">START</button>
+                </div>
+            </div>
+
+            <div id="loader" class="mt-8 loader hidden">
+                <p class="text-[10px] font-bold text-gray-400 tracking-widest uppercase">Analyzing Context...</p>
+            </div>
+        </section>
+
+
+        <section id="flowSection"
+            class="w-full min-h-screen flex-col items-center justify-center bg-[#FDFDFD] relative transition-opacity duration-1000 py-32 hidden">
+
+            <div id="nodesContainer"
+                class="flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center w-full px-4 flex-wrap">
+            </div>
+
+            <div
+                class="absolute bottom-10 text-[10px] font-bold text-gray-300 tracking-widest uppercase animate-bounce">
+                Click a step to view details
+            </div>
+        </section>
+
+
+        <section id="detailSection"
+            class="w-full min-h-screen flex-col items-center bg-[#FDFDFD] relative border-t border-gray-100 transition-all duration-500 hidden">
+            <div id="detailContent" class="w-full max-w-6xl px-6 py-16 flex flex-col items-center"></div>
+        </section>
+
+    </main>
+
+    <script>
+        // ============================================
+        // === Global State ===
+        // ============================================
+        const SUPABASE_URL = 'https://luvbigjinxjgrvrdqtfw.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1dmJpZ2ppbnhqZ3J2cmRxdGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2MDkwODcsImV4cCI6MjA4NjE4NTA4N30.1kZ4PC7zKbxAZYp9B77ZoHSJdyBlI15kEjUlOdwnibs';
+        const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/gemini-proxy`;
+        let sbClient = null;
+        let flowData = [];
+        let currentUser = null;
+        let mindmapCache = {};
+
+        // Editable mindmap state
+        let mmNodes = [];          // flat: { id, text, parentId, isDraft }
+        let mmSelectedId = null;
+        let mmIdCounter = 1;
+        let currentDetailIdx = null;
+        const stepBraindumps = {};  // stepIndex -> text
+
+        // ============================================
+        // === Init & Auth (unchanged) ===
+        // ============================================
+        function init() {
+            console.log("Initializing with built-in config...");
+            initSupabase();
+            document.getElementById('topicInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleStart();
+            });
+        }
+
+        function initSupabase() {
+            console.log("Initializing Supabase...");
+            try {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log("Supabase Client Created");
+                checkAuth();
+            } catch (e) {
+                console.error("Supabase Init Error", e);
+                document.getElementById('authStatus').textContent = "Connection Error";
+            }
+        }
+
+        async function checkAuth() {
+            console.log("Checking Auth...");
+            const statusText = document.getElementById('authStatusText');
+            try {
+                const { data: { session }, error: sErr } = await sbClient.auth.getSession();
+                if (!session) {
+                    console.log("No session found, signing in anonymously...");
+                    const { data, error } = await sbClient.auth.signInAnonymously();
+                    if (error) {
+                        console.error("Auth Error details:", error);
+                        statusText.textContent = "Auth Failed";
+                        return;
+                    }
+                    console.log("Signed in anonymously:", data.user);
+                    currentUser = data.user;
+                } else {
+                    console.log("Session restored:", session.user);
+                    currentUser = session.user;
+                }
+                statusText.textContent = "Connected";
+            } catch (e) {
+                console.error("checkAuth Exception:", e);
+                statusText.textContent = "Error";
+            }
+        }
+
+        function showConfigModal() {
+            console.log("Config is built-in, no modal needed.");
+        }
+
+        // ============================================
+        // === Flow Generation (unchanged) ===
+        // ============================================
+        async function handleStart() {
+            const topic = document.getElementById('topicInput').value;
+            if (!topic) return;
+
+            const loader = document.getElementById('loader');
+            loader.classList.remove('hidden');
+            const inputSection = document.getElementById('inputSection');
+
+            const generatedData = await fetchFlowData(topic);
+
+            if (generatedData) {
+                flowData = generatedData;
+                if (sbClient && currentUser) {
+                    saveFlowToSupabase(topic, generatedData).then(() => console.log("Saved to Supabase"));
+                }
+                loader.classList.add('hidden');
+                inputSection.classList.add('hidden');
+                const flowSection = document.getElementById('flowSection');
+                flowSection.classList.remove('hidden');
+                flowSection.style.display = 'flex';
+                renderFlow();
+                setTimeout(() => { flowSection.classList.remove('opacity-0'); }, 100);
+            } else {
+                loader.classList.add('hidden');
+            }
+        }
+
+        async function fetchFlowData(topic) {
+            try {
+                const prompt = `
+                    Role: Senior Strategic Architect.
+                    Task: Construct a 4-phase strategic roadmap for: "${topic}".
+                    Language: Korean.
+                    Tone: Insightful, Professional, Logic-driven.
+                    Format: JSON Array only.
+                    [
+                        {
+                            "step": "01",
+                            "title": "Short Title (Max 8 chars)",
+                            "rationale": "Why this step is critical.",
+                            "prompts": ["Strategic Question 1", "Perspective 2", "Perspective 3"]
+                        }
+                    ]
+                `;
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                if (!response.ok) throw new Error("Edge Function Error");
+                const data = await response.json();
+                const jsonText = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(jsonText);
+            } catch (error) {
+                console.warn("Gemini Edge Function Failed, using fallback data:", error);
+                return generateFallbackData(topic);
+            }
+        }
+
+        function generateFallbackData(topic) {
+            return [
+                { step: "01", title: "핵심 분석", rationale: `"${topic}"의 본질과 핵심 요소를 파악하여 전략적 기반을 다지는 단계입니다.`, prompts: [`${topic}의 핵심 가치는 무엇인가?`, "현재 시장의 주요 트렌드는?", "경쟁 우위를 확보할 차별점은?"] },
+                { step: "02", title: "전략 수립", rationale: "분석 결과를 바탕으로 실행 가능한 전략적 로드맵을 설계하는 단계입니다.", prompts: ["단기 vs 장기 목표의 우선순위는?", "리소스 배분의 최적 전략은?", "잠재적 리스크를 어떻게 관리할 것인가?"] },
+                { step: "03", title: "실행 설계", rationale: "전략을 구체적인 실행 계획으로 전환하며 팀과 프로세스를 정렬하는 단계입니다.", prompts: ["핵심 마일스톤과 KPI는?", "팀 구성과 역할 분담 전략은?", "애자일한 실행을 위한 프레임워크는?"] },
+                { step: "04", title: "성과 검증", rationale: "실행 결과를 측정하고 지속적 개선 사이클을 확립하는 단계입니다.", prompts: ["성과 측정의 핵심 지표는?", "피드백 루프를 어떻게 구축할 것인가?", "다음 단계로의 확장 전략은?"] }
+            ];
+        }
+
+        // --- Supabase Save (unchanged) ---
+        async function saveFlowToSupabase(topic, data) {
+            if (!currentUser || !sbClient) return;
+            try {
+                const { data: project, error: pErr } = await sbClient
+                    .from('projects').insert({ user_id: currentUser.id, topic: topic, summary: "AI Generated Session" }).select().single();
+                if (pErr) throw pErr;
+                for (const item of data) {
+                    const stepOrder = parseInt(item.step);
+                    const { data: step, error: sErr } = await sbClient
+                        .from('flow_steps').insert({ project_id: project.id, step_order: stepOrder, title: item.title, rationale: item.rationale }).select().single();
+                    if (sErr) throw sErr;
+                    const promptsToInsert = item.prompts.map((pText, idx) => ({ step_id: step.id, prompt_text: pText, order_index: idx }));
+                    const { error: prErr } = await sbClient.from('step_prompts').insert(promptsToInsert);
+                    if (prErr) throw prErr;
+                }
+                console.log("Successfully saved project:", project.id);
+            } catch (err) {
+                console.error("Supabase Save Error:", err);
+            }
+        }
+
+        // ============================================
+        // === Flow Rendering (unchanged) ===
+        // ============================================
+        function renderFlow() { renderNodes(); }
+
+        function renderNodes() {
+            const container = document.getElementById('nodesContainer');
+            container.innerHTML = '';
+            flowData.forEach((item, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'node-wrapper relative group shrink-0';
+                const node = document.createElement('div');
+                node.className = `bg-white w-64 h-64 rounded-full border border-gray-200 flex flex-col justify-center items-center cursor-pointer shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:border-black/30 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-300 z-10`;
+                node.onclick = () => activateStep(index);
+                node.innerHTML = `
+                    <span class="text-[10px] font-bold text-gray-400 tracking-[0.2em] mb-3 uppercase group-hover:text-black transition-colors">0${index + 1}</span>
+                    <h3 class="text-xl font-semibold text-[#111] text-center px-6 leading-tight break-keep tracking-tight">${item.title}</h3>
+                `;
+                wrapper.appendChild(node);
+                container.appendChild(wrapper);
+                if (index < flowData.length - 1) {
+                    const arrow = document.createElement('div');
+                    arrow.className = 'arrow-icon flex items-center justify-center text-gray-300 my-2 md:my-0 md:mx-4 transition-opacity duration-300';
+                    arrow.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="transform rotate-90 md:rotate-0 w-8 h-8 md:w-10 md:h-10 text-gray-300"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
+                    container.appendChild(arrow);
+                }
+            });
+        }
+
+        function activateStep(index) {
+            const container = document.getElementById('nodesContainer');
+            container.classList.add('focus-mode');
+            const wrappers = container.querySelectorAll('.node-wrapper');
+            wrappers.forEach((wrapper, i) => {
+                if (i === index) wrapper.classList.add('active');
+                else wrapper.classList.remove('active');
+            });
+            renderDetail(index);
+        }
+
+        // ============================================
+        // === [NEW] Detail View: Brain Dump + Editable Mindmap ===
+        // ============================================
+        function renderDetail(index) {
+            currentDetailIdx = index;
+            const item = flowData[index];
+            const detailSection = document.getElementById('detailSection');
+            const detailContent = document.getElementById('detailContent');
+
+            detailSection.classList.remove('hidden');
+            detailSection.style.display = 'flex';
+
+            // Restore state
+            const cached = mindmapCache[index];
+            if (cached && cached.mmNodes) {
+                mmNodes = JSON.parse(JSON.stringify(cached.mmNodes));
+                mmIdCounter = cached.mmIdCounter || mmNodes.length + 1;
+            } else {
+                mmNodes = [];
+                mmIdCounter = 1;
+            }
+            mmSelectedId = null;
+
+            const savedText = stepBraindumps[index] || '';
+            const hasMM = mmNodes.length > 0;
+            const hasEdited = hasMM && mmNodes.some(n => !n.isDraft && n.parentId !== null);
+
+            detailContent.innerHTML = `
+                <div class="w-full">
+                    <div class="mb-8 text-center">
+                        <span class="inline-block px-3 py-1 bg-black text-white text-[10px] font-bold tracking-widest uppercase mb-4 rounded-full">Phase 0${index + 1}</span>
+                        <h2 class="text-3xl font-bold text-[#111] mb-2">${item.title}</h2>
+                        <p class="text-sm text-gray-500 max-w-xl mx-auto">"${item.rationale}"</p>
+                    </div>
+
+                    <div class="detail-split">
+                        <!-- Left: Brain Dump -->
+                        <div class="braindump-panel">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-600 mb-1">자유 기입</p>
+                                <p class="text-[10px] text-gray-400">생각나는 대로 자유롭게 적어보세요</p>
+                            </div>
+                            <textarea id="bdArea" class="braindump-textarea" placeholder="이 단계에 대해 떠오르는 생각, 아이디어, 키워드를 자유롭게 적어보세요...&#10;&#10;예시:&#10;- 핵심 문제가 뭔지 먼저 정의&#10;- 사용자 관점에서 다시 생각해보기&#10;- 경쟁사는 어떻게 하고 있지?">${savedText}</textarea>
+                            <div class="ai-suggest-box">
+                                <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">💡 이런 것도 생각해보세요</p>
+                                <div id="suggestChips">${item.prompts.map((p, pi) => `<button class="suggest-chip" onclick="appendToBD(${index},${pi})">${p}</button>`).join('')}</div>
+                            </div>
+                            <button id="orgBtn" class="organize-btn" onclick="handleOrganize(${index})">${hasMM ? '다시 정리하기' : '✨ 정리하기'}</button>
+                        </div>
+
+                        <!-- Right: Mindmap -->
+                        <div class="mm-panel-right">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <p class="text-xs font-semibold text-gray-600">마인드맵</p>
+                                    <p class="text-[10px] text-gray-400" id="mmStatusText">${hasMM ? '클릭: 선택 · 더블클릭: 수정' : '왼쪽에 생각을 적고 "정리하기"를 눌러보세요'}</p>
+                                </div>
+                                ${hasMM ? `<span id="draftBadge" class="draft-badge ${hasEdited ? 'edited' : ''}">${hasEdited ? '수정됨 ✓' : 'AI 초안'}</span>` : ''}
+                            </div>
+                            ${hasMM ? `
+                            <div class="mm-toolbar-row" id="mmToolbar">
+                                <button class="mm-tb-btn" id="tbEdit" onclick="mmEditSelected()" disabled>✏️ 수정</button>
+                                <button class="mm-tb-btn" id="tbAdd" onclick="mmAddChild()" disabled>＋ 하위 추가</button>
+                                <button class="mm-tb-btn danger" id="tbDel" onclick="mmDeleteSelected()" disabled>✕ 삭제</button>
+                                <button class="mm-tb-btn" onclick="mmAddBranch()">＋ 새 가지</button>
+                            </div>` : ''}
+                            <div id="mmCanvas" class="mm-canvas-box">
+                                ${!hasMM ? `<div class="mm-empty-state"><div style="font-size:48px;opacity:0.25;">🧠</div><p class="text-xs">메모를 적고 <strong>"정리하기"</strong>를 눌러보세요</p></div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (hasMM) renderEditableMindmap();
+            detailSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function appendToBD(stepIdx, promptIdx) {
+            const ta = document.getElementById('bdArea');
+            const text = flowData[stepIdx].prompts[promptIdx];
+            ta.value += (ta.value.trim() ? '\n' : '') + '- ' + text;
+            stepBraindumps[stepIdx] = ta.value;
+            ta.focus();
+        }
+
+        // ============================================
+        // === Organize: AI Draft Generation ===
+        // ============================================
+        async function handleOrganize(index) {
+            const ta = document.getElementById('bdArea');
+            const btn = document.getElementById('orgBtn');
+            const text = ta.value.trim();
+            if (!text) { alert('먼저 생각을 자유롭게 적어주세요!'); return; }
+
+            stepBraindumps[index] = ta.value;
+            btn.disabled = true;
+            btn.textContent = '정리 중...';
+
+            const item = flowData[index];
+            const result = await fetchMindmapFromUserText(item.title, item.rationale, text);
+
+            if (result && result.branches) {
+                mmNodes = [];
+                mmIdCounter = 1;
+                const cid = mmIdCounter++;
+                mmNodes.push({ id: cid, text: item.title, parentId: null, isDraft: false });
+                for (const b of result.branches) {
+                    const bid = mmIdCounter++;
+                    mmNodes.push({ id: bid, text: b.label, parentId: cid, isDraft: true });
+                    for (const child of (b.children || [])) {
+                        const lid = mmIdCounter++;
+                        mmNodes.push({ id: lid, text: child, parentId: bid, isDraft: true });
+                    }
+                }
+                saveMmState();
+            }
+
+            btn.disabled = false;
+            btn.textContent = '다시 정리하기';
+            renderDetail(index);
+        }
+
+        async function fetchMindmapFromUserText(stepTitle, rationale, userText) {
+            try {
+                const prompt = `당신은 사용자의 자유로운 메모를 마인드맵 구조의 초안으로 정리하는 보조 도구입니다.
+
+단계: "${stepTitle}" — ${rationale}
+
+사용자가 적은 메모:
+"""
+${userText}
+"""
+
+규칙:
+- 사용자가 적은 내용을 기반으로만 구조화 (새로운 내용 추가 금지)
+- 사용자의 원래 표현을 최대한 유지
+- 비슷한 것끼리 묶어 3~6개 가지로 정리
+- 각 가지에 1~4개 하위 항목
+- 가지 이름: 최대 10자, 하위 항목: 최대 20자
+- 이것은 초안이므로 단정적 표현 쓰지 말 것
+
+JSON만 반환:
+{ "branches": [{ "label": "가지 이름", "children": ["항목1", "항목2"] }] }`;
+
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                if (!response.ok) throw new Error("Edge Function Error");
+                const data = await response.json();
+                const raw = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(raw);
+            } catch (e) {
+                console.error("Organize failed:", e);
+                // Fallback: parse user text line by line
+                return generateFallbackMindmap(userText);
+            }
+        }
+
+        function generateFallbackMindmap(text) {
+            const lines = text.split('\n').filter(l => l.trim()).map(l => l.replace(/^[-•*]\s*/, '').trim());
+            const branches = lines.slice(0, 5).map(l => ({ label: l.slice(0, 20), children: [] }));
+            if (branches.length === 0) branches.push({ label: '아이디어', children: [] });
+            return { branches };
+        }
+
+        // ============================================
+        // === Editable Mindmap Rendering ===
+        // ============================================
+        const MM_COLORS = [
+            { main: '#3B82F6', border: '#93C5FD' },
+            { main: '#10B981', border: '#6EE7B7' },
+            { main: '#F59E0B', border: '#FCD34D' },
+            { main: '#EF4444', border: '#FCA5A5' },
+            { main: '#8B5CF6', border: '#C4B5FD' },
+            { main: '#EC4899', border: '#F9A8D4' },
+        ];
+
+        function getNodeColor(nodeId) {
+            const center = mmNodes.find(n => !n.parentId);
+            if (!center) return MM_COLORS[0];
+            let node = mmNodes.find(n => n.id === nodeId);
+            if (!node || !node.parentId) return { main: '#111', border: '#111' };
+            while (node.parentId !== center.id && node.parentId !== null) {
+                node = mmNodes.find(n => n.id === node.parentId);
+                if (!node) break;
+            }
+            const branches = mmNodes.filter(n => n.parentId === center.id);
+            const idx = branches.findIndex(b => b.id === node.id);
+            return MM_COLORS[Math.max(0, idx) % MM_COLORS.length];
+        }
+
+        function renderEditableMindmap() {
+            const container = document.getElementById('mmCanvas');
+            if (!container || mmNodes.length === 0) return;
+
+            const W = 1200, H = 800;
+            const cx = W / 2, cy = H / 2;
+            const NS = 'http://www.w3.org/2000/svg';
+
+            const center = mmNodes.find(n => !n.parentId);
+            if (!center) return;
+            const branches = mmNodes.filter(n => n.parentId === center.id);
+            const nb = Math.max(branches.length, 1);
+            const R1 = Math.min(300, 150 + nb * 22);
+            const R2 = 170;
+
+            // Position calculation
+            const pos = {};
+            pos[center.id] = { x: cx, y: cy, r: 52 };
+
+            branches.forEach((b, i) => {
+                const a = (2 * Math.PI * i / nb) - Math.PI / 2;
+                pos[b.id] = { x: cx + R1 * Math.cos(a), y: cy + R1 * Math.sin(a), r: 42 };
+                const leaves = mmNodes.filter(n => n.parentId === b.id);
+                const nl = leaves.length;
+                const maxSpread = (2 * Math.PI / nb) * 0.45;
+                const step = nl > 1 ? maxSpread / (nl - 1) : 0;
+                leaves.forEach((l, j) => {
+                    const off = nl > 1 ? (j - (nl - 1) / 2) * step : 0;
+                    pos[l.id] = { x: pos[b.id].x + R2 * Math.cos(a + off), y: pos[b.id].y + R2 * Math.sin(a + off), r: 32 };
+                });
+            });
+
+            // Resolve collisions
+            const layoutArr = Object.entries(pos).map(([id, p]) => ({
+                ...p, id: +id, type: mmNodes.find(n => n.id === +id)?.parentId === null ? 'center' : 'other'
+            }));
+            resolveCollisions(layoutArr, 14);
+            layoutArr.forEach(n => {
+                n.x = Math.max(n.r + 10, Math.min(W - n.r - 10, n.x));
+                n.y = Math.max(n.r + 10, Math.min(H - n.r - 10, n.y));
+                pos[n.id] = { x: n.x, y: n.y, r: n.r };
+            });
+
+            // Create SVG
+            const svg = document.createElementNS(NS, 'svg');
+            svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+            svg.classList.add('mindmap-svg');
+            svg.style.position = 'absolute';
+            svg.style.inset = '0';
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+
+            svg.addEventListener('click', (e) => {
+                if (e.target === svg) { mmSelectedId = null; updateToolbar(); renderEditableMindmap(); }
+            });
+
+            // Shadow filter
+            const defs = document.createElementNS(NS, 'defs');
+            const filter = document.createElementNS(NS, 'filter');
+            filter.setAttribute('id', 'em-shadow');
+            filter.setAttribute('x', '-50%'); filter.setAttribute('y', '-50%');
+            filter.setAttribute('width', '200%'); filter.setAttribute('height', '200%');
+            const fds = document.createElementNS(NS, 'feDropShadow');
+            fds.setAttribute('dx', '0'); fds.setAttribute('dy', '3');
+            fds.setAttribute('stdDeviation', '6'); fds.setAttribute('flood-color', 'rgba(0,0,0,0.05)');
+            filter.appendChild(fds); defs.appendChild(filter); svg.appendChild(defs);
+
+            const linesG = document.createElementNS(NS, 'g');
+            const nodesG = document.createElementNS(NS, 'g');
+
+            // Draw lines
+            mmNodes.forEach(node => {
+                if (node.parentId !== null && pos[node.id] && pos[node.parentId]) {
+                    const color = getNodeColor(node.id);
+                    const from = pos[node.parentId], to = pos[node.id];
+                    addMindmapLine(linesG, from.x, from.y, to.x, to.y, color.main, node.parentId === center.id ? 2 : 1.5, node.isDraft ? 0.15 : 0.3, 0);
+                }
+            });
+
+            // Draw nodes
+            mmNodes.forEach(node => {
+                const p = pos[node.id];
+                if (!p) return;
+                const isCenter = !node.parentId;
+                const isBranch = node.parentId === center.id;
+                const isSelected = node.id === mmSelectedId;
+                const color = isCenter ? { main: '#111', border: '#111' } : getNodeColor(node.id);
+
+                const g = document.createElementNS(NS, 'g');
+                g.classList.add('mindmap-node-g');
+                g.style.animation = `mindmapNodeAppear 0.4s ease forwards`;
+                g.style.opacity = '0';
+
+                const circle = document.createElementNS(NS, 'circle');
+                circle.setAttribute('cx', p.x); circle.setAttribute('cy', p.y); circle.setAttribute('r', p.r);
+                circle.setAttribute('fill', isCenter ? '#111' : '#FFF');
+                circle.setAttribute('stroke', isSelected ? '#3B82F6' : (isCenter ? 'none' : color.border));
+                circle.setAttribute('stroke-width', isSelected ? 3 : 1.5);
+                if (node.isDraft && !isCenter) circle.setAttribute('stroke-dasharray', '6 3');
+                circle.setAttribute('filter', 'url(#em-shadow)');
+
+                const fo = document.createElementNS(NS, 'foreignObject');
+                fo.setAttribute('x', p.x - p.r); fo.setAttribute('y', p.y - p.r);
+                fo.setAttribute('width', p.r * 2); fo.setAttribute('height', p.r * 2);
+                const div = document.createElement('div');
+                div.style.cssText = `width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:${p.r * 0.15}px;font-size:${isCenter ? 14 : (isBranch ? 12 : 11)}px;font-weight:${isCenter ? 700 : (isBranch ? 600 : 400)};color:${isCenter ? '#FFF' : color.main};font-family:'Inter',sans-serif;line-height:1.3;word-break:keep-all;pointer-events:none;border-radius:50%;overflow:hidden;`;
+                div.textContent = node.text;
+                fo.appendChild(div);
+
+                g.appendChild(circle);
+                g.appendChild(fo);
+
+                // AI badge for draft nodes
+                if (node.isDraft && !isCenter) {
+                    const badge = document.createElementNS(NS, 'foreignObject');
+                    badge.setAttribute('x', p.x + p.r * 0.4); badge.setAttribute('y', p.y - p.r - 4);
+                    badge.setAttribute('width', 28); badge.setAttribute('height', 14);
+                    const bDiv = document.createElement('div');
+                    bDiv.style.cssText = 'font-size:8px;color:#92400E;background:#FEF3C7;border-radius:3px;text-align:center;line-height:14px;font-weight:600;pointer-events:none;';
+                    bDiv.textContent = 'AI';
+                    badge.appendChild(bDiv);
+                    g.appendChild(badge);
+                }
+
+                // Click → select
+                g.addEventListener('click', (e) => { e.stopPropagation(); mmSelectedId = node.id; updateToolbar(); renderEditableMindmap(); });
+                // Dblclick → edit
+                g.addEventListener('dblclick', (e) => { e.stopPropagation(); mmSelectedId = node.id; mmEditSelected(); });
+
+                nodesG.appendChild(g);
+            });
+
+            svg.appendChild(linesG);
+            svg.appendChild(nodesG);
+            container.innerHTML = '';
+            container.appendChild(svg);
+        }
+
+        // ============================================
+        // === Mindmap Editing ===
+        // ============================================
+        function updateToolbar() {
+            const btnEdit = document.getElementById('tbEdit');
+            const btnAdd = document.getElementById('tbAdd');
+            const btnDel = document.getElementById('tbDel');
+            if (!btnEdit) return;
+
+            const sel = mmSelectedId !== null;
+            const selNode = mmNodes.find(n => n.id === mmSelectedId);
+            const center = mmNodes.find(n => !n.parentId);
+            const isCenter = sel && selNode && !selNode.parentId;
+
+            btnEdit.disabled = !sel;
+            // Can add child to center and branch nodes (2-level tree)
+            btnAdd.disabled = !(sel && selNode && (selNode.parentId === null || selNode.parentId === center?.id));
+            btnDel.disabled = !sel || isCenter;
+        }
+
+        function mmEditSelected() {
+            if (mmSelectedId === null) return;
+            const node = mmNodes.find(n => n.id === mmSelectedId);
+            if (!node) return;
+
+            // Inline edit via canvas overlay
+            const canvas = document.getElementById('mmCanvas');
+            const svgEl = canvas.querySelector('svg');
+            if (!svgEl) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const vb = svgEl.viewBox.baseVal;
+            const center = mmNodes.find(n => !n.parentId);
+            const branches = mmNodes.filter(n => n.parentId === center?.id);
+            // rough position calc - find node pos from SVG circles
+            const circles = svgEl.querySelectorAll('circle');
+            let nx = rect.width / 2, ny = rect.height / 2;
+            // Use the SVG viewBox to scale
+            const scaleX = rect.width / vb.width;
+            const scaleY = rect.height / vb.height;
+
+            // Find the circle for this node
+            const nodeGs = svgEl.querySelectorAll('.mindmap-node-g');
+            const nodeIdx = mmNodes.findIndex(n => n.id === mmSelectedId);
+            if (nodeIdx >= 0 && nodeGs[nodeIdx]) {
+                const c = nodeGs[nodeIdx].querySelector('circle');
+                if (c) {
+                    nx = parseFloat(c.getAttribute('cx')) * scaleX;
+                    ny = parseFloat(c.getAttribute('cy')) * scaleY;
+                }
+            }
+
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = node.text;
+            inp.className = 'mm-inline-input';
+            inp.style.left = (nx - 60) + 'px';
+            inp.style.top = (ny - 14) + 'px';
+
+            const finish = () => {
+                const newText = inp.value.trim();
+                if (newText && newText !== node.text) {
+                    node.text = newText;
+                    node.isDraft = false;
+                    saveMmState();
+                }
+                inp.remove();
+                renderDetail(currentDetailIdx);
+            };
+            inp.addEventListener('blur', finish);
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); finish(); }
+                if (e.key === 'Escape') { inp.remove(); }
+            });
+
+            canvas.appendChild(inp);
+            inp.focus();
+            inp.select();
+        }
+
+        function mmAddChild() {
+            if (mmSelectedId === null) return;
+            const newText = prompt('새 항목 내용:');
+            if (newText && newText.trim()) {
+                const id = mmIdCounter++;
+                mmNodes.push({ id, text: newText.trim(), parentId: mmSelectedId, isDraft: false });
+                saveMmState();
+                renderDetail(currentDetailIdx);
+            }
+        }
+
+        function mmAddBranch() {
+            const center = mmNodes.find(n => !n.parentId);
+            if (!center) return;
+            const newText = prompt('새 가지 이름:');
+            if (newText && newText.trim()) {
+                const id = mmIdCounter++;
+                mmNodes.push({ id, text: newText.trim(), parentId: center.id, isDraft: false });
+                saveMmState();
+                renderDetail(currentDetailIdx);
+            }
+        }
+
+        function mmDeleteSelected() {
+            if (mmSelectedId === null) return;
+            const node = mmNodes.find(n => n.id === mmSelectedId);
+            if (!node || !node.parentId) return;
+            if (!confirm(`"${node.text}" 항목을 삭제할까요?`)) return;
+
+            const toDelete = new Set();
+            const queue = [mmSelectedId];
+            while (queue.length) {
+                const id = queue.shift();
+                toDelete.add(id);
+                mmNodes.filter(n => n.parentId === id).forEach(n => queue.push(n.id));
+            }
+            mmNodes = mmNodes.filter(n => !toDelete.has(n.id));
+            mmSelectedId = null;
+            saveMmState();
+            renderDetail(currentDetailIdx);
+        }
+
+        function saveMmState() {
+            if (currentDetailIdx === null) return;
+            mindmapCache[currentDetailIdx] = {
+                mmNodes: JSON.parse(JSON.stringify(mmNodes)),
+                mmIdCounter: mmIdCounter
+            };
+        }
+
+        // ============================================
+        // === SVG Utilities (kept from original) ===
+        // ============================================
+        function resolveCollisions(nodes, padding) {
+            for (let iter = 0; iter < 20; iter++) {
+                let moved = false;
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const dx = nodes[j].x - nodes[i].x;
+                        const dy = nodes[j].y - nodes[i].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const minDist = nodes[i].r + nodes[j].r + padding;
+                        if (dist < minDist) {
+                            const overlap = (minDist - dist) / 2;
+                            const nx = dx / dist;
+                            const ny = dy / dist;
+                            if (nodes[i].type === 'center') {
+                                nodes[j].x += nx * overlap * 2;
+                                nodes[j].y += ny * overlap * 2;
+                            } else if (nodes[j].type === 'center') {
+                                nodes[i].x -= nx * overlap * 2;
+                                nodes[i].y -= ny * overlap * 2;
+                            } else {
+                                nodes[i].x -= nx * overlap;
+                                nodes[i].y -= ny * overlap;
+                                nodes[j].x += nx * overlap;
+                                nodes[j].y += ny * overlap;
+                            }
+                            moved = true;
+                        }
+                    }
+                }
+                if (!moved) break;
+            }
+        }
+
+        function mindmapCurvePath(x1, y1, x2, y2) {
+            const dx = x2 - x1, dy = y2 - y1;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const px = -dy / dist, py = dx / dist;
+            const offset = dist * 0.08;
+            const mx = (x1 + x2) / 2 + px * offset;
+            const my = (y1 + y2) / 2 + py * offset;
+            return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
+        }
+
+        function addMindmapLine(group, x1, y1, x2, y2, color, width, opacity, delay) {
+            const NS = 'http://www.w3.org/2000/svg';
+            const path = document.createElementNS(NS, 'path');
+            path.setAttribute('d', mindmapCurvePath(x1, y1, x2, y2));
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', width);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('opacity', opacity);
+            path.setAttribute('stroke-linecap', 'round');
+            path.style.strokeDasharray = '600';
+            path.style.strokeDashoffset = '600';
+            path.style.animation = `drawLine 0.7s ease ${delay}s forwards`;
+            group.appendChild(path);
+        }
+
+        // Initialize
+        init();
+    </script>
+</body>
+<!--
+**Product Requirements Document – Flow Map (MVP 중심)**
+
+**Problem**
+
+지식 작업, 학습, 기획 과정에서 사용자는 사고를 안정적으로 붙잡아 줄 구조와 자유롭게 확장할 수 있는 자율성 사이에서 지속적인 긴장을 경험한다. 기존 생산성 도구는 정형화된 구조를 강하게 요구하여 사고를 이미 정리된 상태로 전제하고, 마인드맵 도구는 자유로운 발산은 허용하지만 사고를 지탱해 줄 흐름 구조가 부족하다. Flow Map은 이 문제를 "정형성과 자율성 사이의 균형 부족"으로 정의하며, 사고를 통제하지 않으면서도 안정적으로 머물게 하는 단계 기반 사고 인터페이스를 제공하는 것을 목표로 한다.
+
+**Opportunity**
+
+Flow Map은 사용자가 입력한 주제에 대해 AI가 4단계 사고 흐름 구조를 제시하는 서비스다. 이 구조는 정답이나 실행 계획이 아니라 사고가 머물 수 있는 인지적 프레임을 제공한다. 각 단계는 질문 중심으로 구성되어 사용자의 사고를 확장하도록 설계된다. 이를 통해 사용자는 사고가 무한히 분산되는 상태를 피하면서도, 고정된 계획에 갇히지 않는 균형 상태를 경험한다.
+
+**Success Metrics**
+
+사용자가 주제를 입력하면 항상 4개의 단계가 생성되어야 한다. 각 단계는 title, rationale, prompts 배열을 포함해야 한다. 단계 노드는 시각적으로 구분된 원형 요소로 표시되어야 한다. 특정 단계를 선택하면 해당 단계는 강조되고, 나머지 단계는 시각적으로 약화되어야 한다. 각 단계의 detail 화면에는 최소 3개의 사고 확장 질문이 표시되어야 한다.
+
+**User Journey**
+
+사용자는 메인 화면에서 주제를 입력한다. 시스템은 입력된 텍스트를 기반으로 AI 또는 Mock Data를 사용해 4단계 사고 흐름 구조를 생성한다. 생성된 단계는 원형 노드 형태로 시각화된다. 사용자는 하나의 단계를 클릭하여 집중 모드로 진입한다. 집중 모드에서는 선택된 단계의 detail 정보가 표시되고, 다른 단계는 흐릿하게 유지된다. 사용자는 다른 단계를 선택하여 사고 흐름을 이동할 수 있다.
+
+**Functional Requirements**
+
+시스템은 사용자의 텍스트 입력을 받아야 한다. 시스템은 입력된 주제를 기반으로 4단계 사고 구조 데이터를 생성해야 한다. 현재 단계에서는 모든 데이터는 Mock Data 파일에서 불러와야 한다. 시스템은 단계 데이터 배열을 기반으로 원형 노드를 렌더링해야 한다. 각 노드는 클릭 이벤트를 가져야 하며, 클릭 시 선택 상태로 변경되어야 한다. 선택된 노드는 강조 스타일을 적용하고, 다른 노드는 blur 및 opacity 감소 스타일을 적용해야 한다. 시스템은 선택된 단계의 title, rationale, prompts를 detail 화면에 렌더링해야 한다. 단계 간 전환은 페이지 이동이 아니라 상태 변경 기반 UI 전환으로 처리해야 한다.
+
+**Non-Functional Requirements**
+
+UI는 인지적 과부하를 유발하지 않아야 한다. 현재 선택된 단계만 선명하게 표시되고, 나머지 단계는 완전히 숨겨지지 않고 흐릿하게 유지되어야 한다. 서비스는 실행 관리 도구처럼 보이지 않아야 하며, 질문 중심의 사고 확장 도구로 인식되어야 한다. 데이터 구조는 향후 Supabase 연동 시에도 변경되지 않도록 고정된 스키마를 유지해야 한다.
+
+**Data Structure (Mock 기반)**
+
+<xml>
+type FlowStep = {
+  step: string;
+  title: string;
+  rationale: string;
+  prompts: string[];
+}
+
+type FlowData = FlowStep[];
+</xml>
+
+Mock Data는 별도의 파일(mockFlowData.ts)에서 export 되어야 하며, UI 컴포넌트 내부에 하드코딩되어서는 안 된다.
+
+**MVP Iteration Design**
+
+**MVP**
+
+Input: 사용자 텍스트 입력
+Process: Mock Data에서 정의된 4단계 구조를 반환
+Output: 원형 노드 기반 단계 시각화 및 detail 패널
+Action: 단계 클릭
+Verification: 사용자가 단계에 커서를 가져가면 해당 단계의 detail이 표시되고 다른 단계는 blur 처리되어야 한다.
+
+**V2**
+
+Input: 사용자 입력 + 주제 유형 분류
+Process: LLM 프롬프팅을 통해 주제 유형별 사고 흐름 생성
+Output: 주제에 따라 다른 톤의 단계 구조
+Action: 단계 간 전환 기록
+Verification: 동일 주제 입력 시 구조적 일관성이 유지되어야 한다
+
+**V3**
+
+Input: 사용자 히스토리 데이터
+Process: 사용자 사고 패턴 기반 개인화된 단계 흐름 생성
+Output: 사용자 맞춤형 사고 구조
+Action: 이전 Flow 불러오기
+Verification: 사용자가 이전 세션을 선택하면 동일한 단계 구조가 복원되어야 한다
+
+**Test Code Guideline**
+
+<xml>
+Test 1: When user inputs text and clicks START, system should render exactly 4 step nodes.
+Test 2: When user clicks a step node, that node must have active style and others must have blur style.
+Test 3: Detail panel must display title, rationale, and at least 3 prompts.
+Test 4: Flow data must be loaded from mock file, not hardcoded inside component.
+</xml>
+
+**Future Work**
+
+V2에서는 실제 LLM API 연동을 통해 주제 기반 단계 생성을 구현한다. V3에서는 사용자 데이터 저장 및 개인화 흐름 추천 기능을 Supabase 기반으로 확장한다.
+
+**Uncertainty Map**
+
+가장 불확실한 부분은 사용자가 이 인터페이스를 사고 도구로 인식할지 여부다. 현재 4단계 구조는 단순화된 모델이며, 실제로는 주제 유형에 따라 단계 수가 달라질 수 있다. 주요 타겟 사용자가 학습자 중심인지, 기획·창작자 중심인지에 따라 단계 구조의 질문 유형이 달라질 필요가 있다.
+-->
+
+</html>

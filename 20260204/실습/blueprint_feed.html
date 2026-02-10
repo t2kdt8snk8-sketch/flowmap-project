@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Prompt Community | Technical Blueprint UI</title>
+    <!-- Architectural & Technical Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Roboto+Mono:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* === Technical Blueprint UI: Core Tokens === */
+        :root {
+            --primary: #FFFFFF;
+            --secondary: #A9CCE3;
+            --background: #3E76B1;
+            --surface: rgba(255, 255, 255, 0.05);
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --accent-highlight: #FFD700;
+            --border-default: rgba(255, 255, 255, 0.8);
+            --border-subtle: rgba(255, 255, 255, 0.3);
+            --border-thick: #FFFFFF;
+            --grid-size: 20px;
+            --font-architect: "Architects Daughter", cursive;
+            --font-technical: "Roboto Mono", monospace;
+            --transition: all 0.2s ease-in-out;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            text-transform: uppercase;
+            /* Design system requirement */
+        }
+
+        body {
+            background-color: var(--background);
+            background-image:
+                linear-gradient(var(--border-subtle) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+            background-size: var(--grid-size) var(--grid-size);
+            color: var(--text-primary);
+            font-family: var(--font-technical);
+            line-height: 1.5;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Architectural Grid Overlay Texture */
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 79px,
+                    rgba(255, 255, 255, 0.05) 80px);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        /* === Navigation === */
+        nav {
+            height: 64px;
+            border-bottom: 2px solid var(--primary);
+            background: rgba(62, 118, 177, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-content {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: var(--font-architect);
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo::before {
+            content: "";
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--primary);
+            border-bottom: none;
+            border-right: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .nav-links a {
+            color: var(--text-primary);
+            text-decoration: none;
+            position: relative;
+            padding: 4px 0;
+            transition: var(--transition);
+        }
+
+        .nav-links a:hover {
+            color: var(--secondary);
+        }
+
+        .nav-links a::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background: var(--primary);
+            transition: var(--transition);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* === Hero & Search === */
+        header {
+            padding: 80px 0 60px;
+            border-bottom: 1px dashed var(--border-subtle);
+        }
+
+        h1 {
+            font-family: var(--font-architect);
+            font-size: var(--font-sizes-h1);
+            margin-bottom: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        .search-area {
+            position: relative;
+            max-width: 600px;
+        }
+
+        .blueprint-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            padding: 16px 20px;
+            color: var(--primary);
+            font-family: var(--font-technical);
+            font-size: 1rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .blueprint-input:focus {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .input-label {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: var(--background);
+            padding: 0 6px;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        /* === Main Feed Grid === */
+        .feed-section {
+            padding: 60px 0;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 32px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .technical-coord {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+        }
+
+        /* === Prompt Card === */
+        .card {
+            background: rgba(62, 118, 177, 0.8);
+            border: 2px solid var(--border-default);
+            padding: 24px;
+            backdrop-filter: blur(4px);
+            position: relative;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card:hover {
+            border-color: var(--primary);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Corner Technical Markers */
+        .card::before,
+        .card::after {
+            content: "";
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border: 1px solid var(--primary);
+        }
+
+        .card::before {
+            top: 8px;
+            left: 8px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .card::after {
+            bottom: 8px;
+            right: 8px;
+            border-left: none;
+            border-top: none;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .category-tag {
+            font-size: 10px;
+            border: 1px solid var(--border-subtle);
+            padding: 2px 8px;
+            color: var(--text-secondary);
+        }
+
+        .card-id {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .card-title {
+            font-family: var(--font-architect);
+            font-size: 1.25rem;
+            color: var(--primary);
+            margin: 8px 0;
+        }
+
+        .card-preview {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border: 1px dashed var(--border-subtle);
+            min-height: 80px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-footer {
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .voter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .vote-btn {
+            width: 28px;
+            height: 28px;
+            border: 1px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .vote-btn:hover {
+            background: var(--primary);
+            color: var(--background);
+        }
+
+        .blueprint-btn {
+            background: var(--primary);
+            color: var(--background);
+            border: none;
+            padding: 8px 16px;
+            font-family: var(--font-technical);
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .blueprint-btn:hover {
+            background: var(--secondary);
+            transform: translateY(-1px);
+        }
+
+        /* === Footer === */
+        footer {
+            padding: 40px 0;
+            border-top: 1px solid var(--primary);
+            margin-top: 100px;
+            font-size: 10px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                padding: 0 20px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="container nav-content">
+            <div class="logo">PROMPT_ARCHIVE</div>
+            <div class="nav-links">
+                <a href="#">DISCOVER</a>
+                <a href="#">COLLECTIONS</a>
+                <a href="#">REFERENCE</a>
+                <a href="#" style="color: var(--accent-highlight)">[ UPLOAD ]</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>ARCHITECTURAL PROMPT_LIBRARY</h1>
+            <div class="search-area">
+                <span class="input-label">SEARCH_BY_PARAMETERS</span>
+                <input type="text" class="blueprint-input" placeholder="ENTER TECHNICAL KEYWORDS OR MODEL NAME...">
+            </div>
+        </header>
+
+        <section class="feed-section">
+            <div class="section-header">
+                <div class="technical-coord">FEED_COORDINATE: 40.7128° N, 74.0060° W</div>
+                <div class="technical-label">SORT_ORDER: PRECISION_DESC</div>
+            </div>
+
+            <div class="grid" id="promptGrid">
+                <!-- Mock Cards will be injected here -->
+            </div>
+        </section>
+
+        <footer>
+            <div>© 2026 ARCHIVE_01 / PROMPT BLUEPRINT SYSTEM v2.4.0</div>
+            <div>STATUS: CONNECTED / ALL SYSTEMS OPERATIONAL</div>
+        </footer>
+    </div>
+
+    <script>
+        const mockData = [
+            { id: "P-1024", title: "HYPER_REALISTIC INTERIOR", category: "MIDJOURNEY v6", desc: "Detailed blueprint for architectural visualization. Focus on light Ray-Tracing, Brutalist RAW texture, and cinematic shadows." },
+            { id: "P-1025", title: "STRATEGIC_BUSINESS PLAN", category: "GPT_O1", desc: "Complex chain-of-thought blueprint for expanding AI startups in Southeast Asia market. High-density logic parameters." },
+            { id: "P-1026", title: "CYBERPUNK CHARACTER_MODEL", category: "FLUX.1", desc: "Mechanical anatomy specifications for synthetic humans. Neon-wire integration, obsidian-plated armor, and lens-flare data." },
+            { id: "P-1027", title: "MINIMALIST LOGO_DRAFT", category: "DALL-E 3", desc: "Swiss-design influenced vector prompt. Golden ratio alignment, negative space optimization, and monochrome output." },
+            { id: "P-1028", title: "POETIC_NARRATIVE ENGINE", category: "CLAUDE 3.5", desc: "Metaphorical reasoning framework for generating interactive fiction with melancholic undertones and layered mythology." },
+            { id: "P-1029", title: "SYNTHWAVE SOUND_SCAPE", category: "SUNO v3", desc: "Audio-visual blueprint for 80s analog synth waves. Reverb-drenched kicks, shimmering arps, and neon-dusk mood." }
+        ];
+
+        function renderCards() {
+            const grid = document.getElementById('promptGrid');
+            grid.innerHTML = mockData.map(item => `
+                <div class="card">
+                    <div class="card-header">
+                        <span class="category-tag">${item.category}</span>
+                        <span class="card-id">${item.id}</span>
+                    </div>
+                    <h3 class="card-title">${item.title}</h3>
+                    <div class="card-preview">${item.desc}</div>
+                    <div class="card-footer">
+                        <div class="voter">
+                            <button class="vote-btn">▲</button>
+                            <span>128</span>
+                        </div>
+                        <button class="blueprint-btn" onclick="copyPrompt('${item.id}')">CLONE_DATA</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function copyPrompt(id) {
+            alert(`[${id}] PROMPT DATA CLONED TO BUFFER.`);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', renderCards);
+    </script>
+</body>
+
+</html>

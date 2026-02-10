@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Map</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #F9FAFB;
+            --text-primary: #111827;
+            --text-secondary: #4B5563;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        h1,
+        h2,
+        h3,
+        .brand-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Input Style */
+        .clean-input {
+            border: 1px solid #E5E7EB;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .clean-input:focus {
+            border-color: #111827;
+            outline: none;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+        }
+
+        /* === Flow Stage === */
+        .stage-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 80vh;
+            position: relative;
+            transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .stage-hidden {
+            opacity: 0;
+            transform: translateY(-40px) scale(0.95);
+            pointer-events: none;
+            height: 0;
+            overflow: hidden;
+        }
+
+        /* Track between nodes */
+        .flow-track-segment {
+            height: 6px;
+            background: linear-gradient(to right, #E5E7EB, #F3F4F6);
+            border-radius: 999px;
+            flex: 1;
+            margin: 0 40px;
+            position: relative;
+            transition: background 0.8s ease;
+        }
+
+        .flow-track-segment.active {
+            background: linear-gradient(to right, #111827, #374151);
+        }
+
+        /* === Flow Nodes (190px circles) === */
+        .flow-node {
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(17, 24, 39, 0.06);
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+            position: relative;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .flow-node:hover {
+            transform: scale(1.08);
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .flow-node.active-node {
+            transform: scale(1.25);
+            box-shadow: 0 60px 140px rgba(0, 0, 0, 0.12);
+            border-color: rgba(17, 24, 39, 0.1);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .flow-node.completed-node {
+            background: rgba(16, 185, 129, 0.05);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+
+        .node-step-num {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: rgba(17, 24, 39, 0.4);
+            text-transform: uppercase;
+        }
+
+        .active-node .node-step-num {
+            color: #111827;
+        }
+
+        .completed-node .node-step-num {
+            color: #059669;
+        }
+
+        .node-title {
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.3;
+            color: #111827;
+            max-width: 80%;
+        }
+
+        .micro-lines {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            margin-top: 6px;
+            opacity: 0.3;
+        }
+
+        .micro-line {
+            height: 2px;
+            background: #111827;
+            border-radius: 999px;
+        }
+
+        /* === Detail Screen === */
+        #detailScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: #F9FAFB;
+            min-height: 100vh;
+            width: 100vw;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(20px);
+            transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #detailScreen.active-page {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .detail-hero {
+            padding: 80px 0 30px;
+            text-align: center;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #9CA3AF;
+            cursor: pointer;
+            transition: color 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-btn:hover {
+            color: #111827;
+        }
+
+        /* === Detail Content: 2-panel split (braindump + mindmap) === */
+        .detail-workspace {
+            display: flex;
+            flex: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 24px 40px;
+            gap: 20px;
+            min-height: 500px;
+        }
+
+        /* Left: Brain Dump */
+        .braindump-panel {
+            width: 38%;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #E8ECF0;
+            overflow: hidden;
+        }
+
+        .braindump-header {
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid #F0F2F5;
+        }
+
+        .braindump-textarea {
+            flex: 1;
+            padding: 16px 20px;
+            border: none;
+            outline: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #334155;
+            resize: none;
+            background: transparent;
+        }
+
+        .braindump-textarea::placeholder {
+            color: #94A3B8;
+        }
+
+        .braindump-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #F0F2F5;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-organize {
+            padding: 8px 20px;
+            background: #3B82F6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-organize:hover {
+            background: #2563EB;
+        }
+
+        .btn-organize:disabled {
+            background: #94A3B8;
+            cursor: not-allowed;
+        }
+
+        /* Suggestions */
+        .suggestions-area {
+            padding: 10px 20px 14px;
+            border-top: 1px solid #F0F2F5;
+            background: #F8FAFC;
+            border-radius: 0 0 16px 16px;
+        }
+
+        .suggestion-chip {
+            display: inline-block;
+            padding: 6px 12px;
+            margin: 3px;
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            font-size: 11px;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .suggestion-chip:hover {
+            border-color: #3B82F6;
+            color: #2563EB;
+            background: #EFF6FF;
+        }
+
+        /* Right: Mindmap */
+        .mindmap-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #F8F9FB;
+            border-radius: 16px;
+            border: 1px solid #E8ECF0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mindmap-header {
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .draft-badge {
+            padding: 3px 8px;
+            background: #FEF3C7;
+            color: #92400E;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+
+        .draft-badge.edited {
+            background: #DCFCE7;
+            color: #166534;
+        }
+
+        .mindmap-canvas {
+            flex: 1;
+            position: relative;
+        }
+
+        .mindmap-empty {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #94A3B8;
+            gap: 8px;
+        }
+
+        .mindmap-empty svg {
+            width: 48px;
+            height: 48px;
+            opacity: 0.3;
+        }
+
+        /* SVG Mindmap */
+        .mm-line {
+            stroke: #CBD5E1;
+            stroke-width: 1.5;
+            fill: none;
+            opacity: 0;
+            animation: lineAppear 0.6s ease forwards;
+        }
+
+        @keyframes lineAppear {
+            to {
+                opacity: 0.6;
+            }
+        }
+
+        @keyframes nodeAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .inline-edit-input {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            border: 2px solid #3B82F6;
+            border-radius: 6px;
+            padding: 3px 6px;
+            outline: none;
+            background: white;
+            min-width: 70px;
+            text-align: center;
+        }
+
+        /* Node toolbar */
+        .mm-toolbar {
+            position: fixed;
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 4px;
+            display: flex;
+            gap: 2px;
+            z-index: 200;
+        }
+
+        .mm-toolbar button {
+            padding: 5px 8px;
+            border: none;
+            background: transparent;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.15s;
+        }
+
+        .mm-toolbar button:hover {
+            background: #F1F5F9;
+        }
+
+        .mm-toolbar button.danger:hover {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #E2E8F0;
+            border-top-color: #3B82F6;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Loader dots */
+        .loader-dots div {
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+
+        .loader-dots div:nth-child(1) {
+            left: 8px;
+            animation: loader-dots1 0.6s infinite;
+        }
+
+        .loader-dots div:nth-child(2) {
+            left: 8px;
+            animation: loader-dots2 0.6s infinite;
+        }
+
+        .loader-dots div:nth-child(3) {
+            left: 32px;
+            animation: loader-dots2 0.6s infinite;
+        }
+
+        .loader-dots div:nth-child(4) {
+            left: 56px;
+            animation: loader-dots3 0.6s infinite;
+        }
+
+        @keyframes loader-dots1 {
+            0% {
+                transform: scale(0);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes loader-dots3 {
+            0% {
+                transform: scale(1);
+            }
+
+            100% {
+                transform: scale(0);
+            }
+        }
+
+        @keyframes loader-dots2 {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(24px, 0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .detail-workspace {
+                flex-direction: column;
+            }
+
+            .braindump-panel {
+                width: 100%;
+                min-width: unset;
+            }
+        }
+    </style>
+</head>
+
+<body class="antialiased opacity-0 transition-opacity duration-1000"
+    onload="document.body.classList.remove('opacity-0')">
+
+    <!-- Global Nav -->
+    <nav class="fixed top-0 w-full z-40 px-10 py-8 flex justify-between items-center pointer-events-none">
+        <a href="index.html"
+            class="text-xl font-bold tracking-tight text-gray-900 brand-font pointer-events-auto mix-blend-multiply">FLOW
+            MAP</a>
+        <div class="flex items-center gap-4 pointer-events-auto">
+            <span id="authStatusText" class="text-xs text-gray-400">연결 중...</span>
+        </div>
+    </nav>
+
+    <!-- Main Views -->
+    <main class="relative min-h-screen w-full flex flex-col justify-center overflow-hidden">
+
+        <!-- [SCENE 1] Input -->
+        <section id="inputSection"
+            class="w-full max-w-xl mx-auto text-center px-6 relative z-10 transition-all duration-700">
+            <div class="mb-12">
+                <span class="text-sm font-bold tracking-widest text-[#111827] uppercase mb-4 block opacity-40">Project
+                    Initiator</span>
+                <h1 class="text-5xl md:text-6xl font-bold text-[#111827] brand-font leading-tight tracking-tight">
+                    Flow<br>Map</h1>
+            </div>
+            <div class="relative w-full group">
+                <input type="text" id="projectInput"
+                    class="w-full clean-input text-lg pl-8 pr-32 py-5 rounded-xl text-gray-900 placeholder-gray-400 text-center"
+                    placeholder="Start a new project..." onkeypress="if(event.key==='Enter')handleStart()">
+                <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                    <button onclick="handleStart()"
+                        class="bg-[#111827] hover:bg-black text-white px-6 py-2 rounded-lg text-sm font-bold tracking-wider transition shadow-lg shadow-gray-200/50">START</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- [SCENE 2] Loading -->
+        <section id="loadingSection"
+            class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#F9FAFB]">
+            <div class="loader-dots relative w-24 h-6 mb-8">
+                <div class="absolute top-0 w-4 h-4 rounded-full bg-gray-900"></div>
+                <div class="absolute top-0 w-4 h-4 rounded-full bg-gray-900"></div>
+                <div class="absolute top-0 w-4 h-4 rounded-full bg-gray-900"></div>
+                <div class="absolute top-0 w-4 h-4 rounded-full bg-gray-900"></div>
+            </div>
+            <p class="text-gray-400 text-sm font-medium tracking-widest uppercase animate-pulse">Constructing Flow...
+            </p>
+        </section>
+
+        <!-- [SCENE 3] Flow Stage -->
+        <section id="flowScreen" class="stage-hidden w-full max-w-7xl mx-auto px-10">
+            <div class="text-center mb-16 opacity-50 hover:opacity-100 transition duration-500">
+                <h2 id="projectTitleDisplay" class="text-lg font-medium text-gray-500 brand-font">Project Title</h2>
+            </div>
+            <div class="stage-container">
+                <div id="flowTrackContainer" class="w-full flex items-center justify-between px-10">
+                    <!-- JS Injected -->
+                </div>
+            </div>
+        </section>
+
+        <!-- [SCENE 4] Detail Screen (Overlay) -->
+        <section id="detailScreen">
+            <button onclick="backToFlow()" class="back-btn group">
+                <span class="group-hover:-translate-x-1 transition-transform">←</span> Back to Flow
+            </button>
+
+            <div class="detail-hero">
+                <span id="detailStepNum"
+                    class="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] block mb-4">STEP 01</span>
+                <h2 id="detailStepTitle" class="text-4xl md:text-5xl font-bold text-gray-900 brand-font tracking-tight">
+                    Step Title</h2>
+                <p id="detailRationale" class="text-base text-gray-400 mt-4 max-w-lg mx-auto">Rationale</p>
+            </div>
+
+            <!-- Detail Workspace: Brain Dump + Mindmap -->
+            <div class="detail-workspace">
+
+                <!-- Left: Brain Dump -->
+                <div class="braindump-panel">
+                    <div class="braindump-header">
+                        <p class="text-xs font-semibold text-gray-500">💭 자유 메모</p>
+                        <p class="text-[10px] text-gray-400 mt-1">이 단계에 대해 자유롭게 적어보세요</p>
+                    </div>
+                    <textarea id="braindumpArea" class="braindump-textarea"
+                        placeholder="이 단계에 대해 떠오르는 생각을 자유롭게 적어보세요...&#10;&#10;예시:&#10;- 핵심 고려사항은...&#10;- 놓치고 있는 것은...&#10;- 이 단계에서 가장 중요한 건..."></textarea>
+                    <div class="braindump-footer">
+                        <button id="organizeBtn" onclick="handleOrganize()" class="btn-organize" disabled>
+                            ✨ 정리하기
+                        </button>
+                        <span class="text-[10px] text-gray-400">AI 초안 생성</span>
+                        <div id="organizeSpinner" class="hidden spinner"></div>
+                    </div>
+                    <div id="suggestionsArea" class="suggestions-area hidden">
+                        <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">💡 생각 확장</p>
+                        <div id="suggestionsContainer"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Mindmap -->
+                <div class="mindmap-panel">
+                    <div class="mindmap-header">
+                        <span class="text-xs font-medium text-gray-400">마인드맵</span>
+                        <span id="draftBadge" class="draft-badge hidden">DRAFT — AI 초안</span>
+                    </div>
+                    <div id="mindmapCanvas" class="mindmap-canvas">
+                        <div id="mindmapEmpty" class="mindmap-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="3" />
+                                <line x1="12" y1="1" x2="12" y2="5" />
+                                <line x1="12" y1="19" x2="12" y2="23" />
+                                <line x1="1" y1="12" x2="5" y2="12" />
+                                <line x1="19" y1="12" x2="23" y2="12" />
+                            </svg>
+                            <p class="text-xs">메모를 적고 <strong>'정리하기'</strong>를 눌러보세요</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Node Toolbar (floating) -->
+    <div id="mmToolbar" class="mm-toolbar hidden">
+        <button onclick="mmStartEdit()" title="이름 수정">✏️</button>
+        <button onclick="mmAddChild()" title="하위 추가">➕</button>
+        <button onclick="mmDeleteNode()" class="danger" title="삭제">🗑️</button>
+    </div>
+
+    <script>
+        // ============================================
+        // === Config & State ===
+        // ============================================
+        const SUPABASE_URL = 'https://luvbigjinxjgrvrdqtfw.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1dmJpZ2ppbnhqZ3J2cmRxdGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2MDkwODcsImV4cCI6MjA4NjE4NTA4N30.1kZ4PC7zKbxAZYp9B77ZoHSJdyBlI15kEjUlOdwnibs';
+        const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/gemini-proxy`;
+
+        let sbClient = null;
+        let currentUser = null;
+        let currentPlanData = null;
+        let activeController = null;
+
+        // Mindmap state (per detail step)
+        const mmState = {
+            treeData: null,
+            selectedId: null,
+            isAIDraft: false,
+            userEdited: false,
+            currentStepIndex: -1
+        };
+        const stepMindmaps = {};   // cache: stepIndex -> treeData
+        const stepBraindumps = {}; // cache: stepIndex -> text
+        let nextNodeId = 1;
+        function genId() { return 'n_' + (nextNodeId++); }
+
+        // ============================================
+        // === Init & Auth ===
+        // ============================================
+        function init() {
+            initSupabase();
+            const ta = document.getElementById('braindumpArea');
+            ta.addEventListener('input', () => {
+                document.getElementById('organizeBtn').disabled = !ta.value.trim();
+                stepBraindumps[mmState.currentStepIndex] = ta.value;
+            });
+        }
+
+        function initSupabase() {
+            try {
+                sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                checkAuth();
+            } catch (e) {
+                console.error("Supabase Init Error", e);
+                document.getElementById('authStatusText').textContent = "오프라인";
+            }
+        }
+
+        async function checkAuth() {
+            try {
+                const { data: { session } } = await sbClient.auth.getSession();
+                if (!session) {
+                    const { data, error } = await sbClient.auth.signInAnonymously();
+                    if (error) { document.getElementById('authStatusText').textContent = "인증 실패"; return; }
+                    currentUser = data.user;
+                } else {
+                    currentUser = session.user;
+                }
+                document.getElementById('authStatusText').textContent = "연결됨 ✓";
+            } catch (e) {
+                console.error("Auth Error:", e);
+                document.getElementById('authStatusText').textContent = "오프라인";
+            }
+        }
+
+        // ============================================
+        // === [SCENE 1→2→3] Start & Flow Generation ===
+        // ============================================
+        async function handleStart() {
+            const input = document.getElementById('projectInput');
+            const topic = input.value.trim();
+            if (!topic) { input.classList.add('border-red-500'); return; }
+
+            if (activeController) { activeController.abort(); }
+            activeController = new AbortController();
+            const signal = activeController.signal;
+
+            const inputSection = document.getElementById('inputSection');
+            const loadingSection = document.getElementById('loadingSection');
+            const flowScreen = document.getElementById('flowScreen');
+
+            // UI: Input → Loading
+            inputSection.style.opacity = '0';
+            inputSection.style.transform = 'scale(0.9)';
+            await new Promise(r => setTimeout(r, 500));
+            if (signal.aborted) return;
+
+            inputSection.classList.add('hidden');
+            loadingSection.classList.remove('hidden');
+            loadingSection.style.display = 'flex';
+            document.getElementById('projectTitleDisplay').innerText = topic;
+
+            try {
+                const data = await fetchFlowData(topic, signal);
+                if (signal.aborted) throw new Error("Aborted");
+
+                currentPlanData = data;
+                renderFlowMap(data);
+
+                loadingSection.classList.add('hidden');
+                loadingSection.style.display = 'none';
+                flowScreen.classList.remove('stage-hidden');
+                flowScreen.style.height = 'auto';
+                activateStepVisuals(1);
+            } catch (error) {
+                if (error.name === 'AbortError' || (error.message && error.message.includes('abort'))) return;
+                console.error("Error:", error);
+
+                // Fallback
+                const fallback = generateFallbackFlowData(topic);
+                currentPlanData = fallback;
+                renderFlowMap(fallback);
+                loadingSection.classList.add('hidden');
+                loadingSection.style.display = 'none';
+                flowScreen.classList.remove('stage-hidden');
+                flowScreen.style.height = 'auto';
+                activateStepVisuals(1);
+            } finally {
+                if (activeController && activeController.signal === signal) {
+                    if (flowScreen.classList.contains('stage-hidden')) {
+                        loadingSection.classList.add('hidden');
+                        loadingSection.style.display = 'none';
+                        inputSection.classList.remove('hidden');
+                        inputSection.style.opacity = '1';
+                        inputSection.style.transform = 'scale(1)';
+                    }
+                    activeController = null;
+                }
+            }
+        }
+
+        async function fetchJsonWithTimeout(url, prompt, signal, timeoutMs = 15000) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+            if (signal) {
+                signal.addEventListener('abort', () => controller.abort());
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt }),
+                    signal: controller.signal
+                });
+
+                if (!response.ok) throw new Error(`API ${response.status}`);
+                return await response.json();
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        async function fetchFlowData(topic, signal) {
+            try {
+                const prompt = `
+Role: Senior Strategic Architect.
+Task: Construct a 4-phase strategic roadmap for: "${topic}".
+Language: Korean.
+Tone: Insightful, Professional, Logic-driven.
+Format: JSON Array only.
+[
+    {
+        "step": "01",
+        "title": "Short Title (Max 8 chars)",
+        "rationale": "Why this step is critical.",
+        "prompts": ["Strategic Question 1", "Perspective 2", "Perspective 3"]
+    }
+]`;
+
+                const data = await fetchJsonWithTimeout(EDGE_FUNCTION_URL, prompt, signal, 15000);
+
+
+                const rawText = data.candidates[0].content.parts[0].text;
+                const clean = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                const start = clean.indexOf('[');
+                const end = clean.lastIndexOf(']') + 1;
+                return JSON.parse(clean.substring(start, end));
+            } catch (error) {
+                console.warn("API failed, using fallback:", error);
+                return generateFallbackFlowData(topic);
+            }
+        }
+
+        function generateFallbackFlowData(topic) {
+            return [
+                { step: 1, title: "정의", rationale: "프로젝트의 핵심 목표와 범위를 명확히 정의합니다.", prompts: ["핵심 문제는 무엇인가?", "주요 이해관계자는 누구인가?", "성공의 기준은?"] },
+                { step: 2, title: "탐색", rationale: "다양한 관점에서 영감을 얻고 가능성을 탐색합니다.", prompts: ["유사 사례는?", "어떤 기술을 활용할 수 있는가?", "사용자의 진짜 니즈는?"] },
+                { step: 3, title: "구조화", rationale: "아이디어를 체계적인 구조로 정리합니다.", prompts: ["우선순위는 어떻게 정할 것인가?", "핵심 기능은 무엇인가?", "리스크 요소는?"] },
+                { step: 4, title: "실행", rationale: "구체적인 실행 계획을 수립하고 실행합니다.", prompts: ["첫 번째 마일스톤은?", "피드백 루프를 어떻게 구축할 것인가?", "확장 전략은?"] }
+            ];
+        }
+
+        // ============================================
+        // === [SCENE 3] Flow Map Rendering ===
+        // ============================================
+        function renderFlowMap(stepsData) {
+            const container = document.getElementById('flowTrackContainer');
+            container.innerHTML = '';
+
+            stepsData.forEach((step, index) => {
+                const stepNum = index + 1;
+                container.innerHTML += `
+                <div class="relative z-10" onclick="onClickStep(${stepNum})">
+                    <div id="node-${stepNum}" class="flow-node">
+                        <span class="node-step-num">0${stepNum}</span>
+                        <span class="node-title">${step.title}</span>
+                        <div class="micro-lines">
+                            <div class="micro-line w-8"></div>
+                        </div>
+                    </div>
+                </div>`;
+
+                if (stepNum < stepsData.length) {
+                    container.innerHTML += `<div id="track-${stepNum}" class="flow-track-segment"></div>`;
+                }
+            });
+        }
+
+        function activateStepVisuals(stepNum) {
+            for (let i = 1; i <= 4; i++) {
+                const node = document.getElementById(`node-${i}`);
+                const track = document.getElementById(`track-${i}`);
+                if (!node) continue;
+                node.className = 'flow-node';
+                if (track) track.className = 'flow-track-segment';
+                if (i < stepNum) {
+                    node.classList.add('completed-node');
+                    if (track) track.classList.add('active');
+                } else if (i === stepNum) {
+                    node.classList.add('active-node');
+                }
+            }
+        }
+
+        // ============================================
+        // === [SCENE 4] Detail View ===
+        // ============================================
+        function onClickStep(stepNum) {
+            if (!currentPlanData) return;
+            const step = currentPlanData[stepNum - 1];
+            const idx = stepNum - 1;
+            mmState.currentStepIndex = idx;
+
+            document.getElementById('detailStepNum').innerText = `STEP 0${stepNum}`;
+            document.getElementById('detailStepTitle').innerText = step.title;
+            document.getElementById('detailRationale').innerText = step.rationale;
+
+            // Restore braindump text for this step
+            const ta = document.getElementById('braindumpArea');
+            ta.value = stepBraindumps[idx] || '';
+            document.getElementById('organizeBtn').disabled = !ta.value.trim();
+
+            // Restore mindmap for this step if cached
+            if (stepMindmaps[idx]) {
+                mmState.treeData = stepMindmaps[idx];
+                mmState.isAIDraft = true;
+                renderMindmap();
+                updateDraftBadge();
+            } else {
+                mmState.treeData = null;
+                mmState.selectedId = null;
+                mmState.isAIDraft = false;
+                mmState.userEdited = false;
+                document.getElementById('draftBadge').classList.add('hidden');
+                clearMindmap();
+
+                // Auto-generate initial suggestions based on step prompts
+                showSuggestions(step.prompts || []);
+            }
+
+            document.getElementById('detailScreen').classList.add('active-page');
+        }
+
+        function backToFlow() {
+            document.getElementById('detailScreen').classList.remove('active-page');
+            hideToolbar();
+        }
+
+        // ============================================
+        // === Brain Dump & Organize ===
+        // ============================================
+        async function handleOrganize() {
+            const text = document.getElementById('braindumpArea').value.trim();
+            if (!text) return;
+
+            const step = currentPlanData[mmState.currentStepIndex];
+            const btn = document.getElementById('organizeBtn');
+            const spinner = document.getElementById('organizeSpinner');
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            try {
+                const tree = await fetchMindmapDraft(step.title, step.rationale, text);
+                mmState.treeData = tree;
+                mmState.isAIDraft = true;
+                mmState.userEdited = false;
+                stepMindmaps[mmState.currentStepIndex] = tree;
+                renderMindmap();
+                updateDraftBadge();
+
+                // Fetch follow-up suggestions
+                fetchSuggestions(step.title, text);
+            } catch (e) {
+                console.error("Organize error:", e);
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        }
+
+        // ============================================
+        // === AI: Mindmap Draft Generation ===
+        // ============================================
+        async function fetchMindmapDraft(stepTitle, rationale, dumpText) {
+            try {
+                const prompt = `당신은 사용자의 자유로운 메모를 구조화하는 사고 보조 도구입니다.
+
+단계: "${stepTitle}" — ${rationale}
+
+사용자가 자유롭게 적은 메모:
+"""
+${dumpText}
+"""
+
+위 내용을 이 단계에 맞게 마인드맵 구조로 정리해주세요.
+이것은 확정된 구조가 아니라 "초안(Draft)"입니다.
+
+규칙:
+- 중심 노드는 단계 제목
+- 1단계 가지는 핵심 카테고리 (3~5개)
+- 2단계 가지는 세부 아이디어 (각 1~3개)
+- 사용자의 원문 표현을 최대한 살려주세요
+- 새로운 내용을 임의로 추가하지 마세요
+
+JSON 형식만 반환:
+{
+  "text": "중심 주제",
+  "children": [
+    { "text": "가지1", "children": [{ "text": "세부1" }] }
+  ]
+}`;
+
+                const data = await fetchJsonWithTimeout(EDGE_FUNCTION_URL, prompt, null, 15000);
+                const raw = data.candidates[0].content.parts[0].text
+                    .replace(/```json/g, '').replace(/```/g, '').trim();
+                return assignIds(JSON.parse(raw));
+            } catch (e) {
+                console.warn("Mindmap AI failed, fallback:", e);
+                return generateFallbackMindmap(stepTitle, dumpText);
+            }
+        }
+
+        function generateFallbackMindmap(title, text) {
+            const lines = text.split('\n').filter(l => l.trim());
+            const children = lines.slice(0, 5).map(l => ({
+                text: l.replace(/^[-•*]\s*/, '').trim().slice(0, 25),
+                children: []
+            }));
+            if (children.length === 0) {
+                children.push({ text: '아이디어 추가', children: [] });
+            }
+            return assignIds({ text: title, children });
+        }
+
+        function assignIds(node, depth = 0) {
+            node.id = genId();
+            node.depth = depth;
+            node.children = node.children || [];
+            node.children.forEach(c => assignIds(c, depth + 1));
+            return node;
+        }
+
+        // ============================================
+        // === AI: Suggestions ===
+        // ============================================
+        async function fetchSuggestions(stepTitle, text) {
+            try {
+                const prompt = `단계: "${stepTitle}"
+사용자 메모: "${text.slice(0, 400)}"
+
+사용자의 사고를 확장할 수 있는 질문 3개를 한국어로 제안해주세요.
+빠져있는 관점을 발견하게 하는 열린 질문으로. 각 20자 이내.
+JSON Array만 반환: ["질문1", "질문2", "질문3"]`;
+
+                const data = await fetchJsonWithTimeout(EDGE_FUNCTION_URL, prompt, null, 10000);
+                const raw = data.candidates[0].content.parts[0].text
+                    .replace(/```json/g, '').replace(/```/g, '').trim();
+                showSuggestions(JSON.parse(raw));
+            } catch (e) {
+                // Suggestions are optional, fail silently
+            }
+        }
+
+        function showSuggestions(questions) {
+            if (!questions || questions.length === 0) return;
+            const area = document.getElementById('suggestionsArea');
+            const container = document.getElementById('suggestionsContainer');
+            container.innerHTML = '';
+            area.classList.remove('hidden');
+
+            questions.forEach(q => {
+                const chip = document.createElement('button');
+                chip.className = 'suggestion-chip';
+                chip.textContent = q;
+                chip.onclick = () => {
+                    const ta = document.getElementById('braindumpArea');
+                    ta.value += (ta.value ? '\n' : '') + '- ' + q;
+                    ta.dispatchEvent(new Event('input'));
+                    ta.focus();
+                };
+                container.appendChild(chip);
+            });
+        }
+
+        // ============================================
+        // === Mindmap: Data Operations ===
+        // ============================================
+        function findNode(node, id) {
+            if (node.id === id) return node;
+            for (const c of (node.children || [])) {
+                const f = findNode(c, id);
+                if (f) return f;
+            }
+            return null;
+        }
+
+        function findParent(node, id) {
+            for (const c of (node.children || [])) {
+                if (c.id === id) return node;
+                const f = findParent(c, id);
+                if (f) return f;
+            }
+            return null;
+        }
+
+        function mmAddChildNode(parentId, text = '새 아이디어') {
+            const parent = findNode(mmState.treeData, parentId);
+            if (!parent) return;
+            const n = { id: genId(), text, children: [], depth: parent.depth + 1 };
+            parent.children.push(n);
+            mmState.userEdited = true;
+            stepMindmaps[mmState.currentStepIndex] = mmState.treeData;
+            updateDraftBadge();
+            renderMindmap();
+            selectMmNode(n.id);
+        }
+
+        function mmDeleteNodeById(nodeId) {
+            if (!mmState.treeData || mmState.treeData.id === nodeId) return;
+            const parent = findParent(mmState.treeData, nodeId);
+            if (!parent) return;
+            parent.children = parent.children.filter(c => c.id !== nodeId);
+            mmState.selectedId = null;
+            mmState.userEdited = true;
+            stepMindmaps[mmState.currentStepIndex] = mmState.treeData;
+            hideToolbar();
+            updateDraftBadge();
+            renderMindmap();
+        }
+
+        function mmRenameNodeById(nodeId, newText) {
+            const node = findNode(mmState.treeData, nodeId);
+            if (!node || !newText.trim()) return;
+            node.text = newText.trim();
+            mmState.userEdited = true;
+            stepMindmaps[mmState.currentStepIndex] = mmState.treeData;
+            updateDraftBadge();
+            renderMindmap();
+            selectMmNode(nodeId);
+        }
+
+        function updateDraftBadge() {
+            const badge = document.getElementById('draftBadge');
+            badge.classList.remove('hidden');
+            if (mmState.userEdited) {
+                badge.textContent = '수정됨 ✓';
+                badge.classList.add('edited');
+            } else {
+                badge.textContent = 'DRAFT — AI 초안';
+                badge.classList.remove('edited');
+            }
+        }
+
+        // ============================================
+        // === Mindmap: SVG Rendering ===
+        // ============================================
+        function clearMindmap() {
+            const canvas = document.getElementById('mindmapCanvas');
+            const svg = canvas.querySelector('svg');
+            if (svg) svg.remove();
+            document.getElementById('mindmapEmpty').classList.remove('hidden');
+        }
+
+        function renderMindmap() {
+            const canvas = document.getElementById('mindmapCanvas');
+            const empty = document.getElementById('mindmapEmpty');
+            if (!mmState.treeData) { empty.classList.remove('hidden'); return; }
+            empty.classList.add('hidden');
+
+            const old = canvas.querySelector('svg');
+            if (old) old.remove();
+
+            const rect = canvas.getBoundingClientRect();
+            const w = rect.width || 600;
+            const h = rect.height || 400;
+
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%');
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            svg.style.position = 'absolute';
+            svg.style.inset = '0';
+
+            svg.addEventListener('click', (e) => {
+                if (e.target === svg) { mmState.selectedId = null; hideToolbar(); renderMindmap(); }
+            });
+
+            layoutRadial(mmState.treeData, w / 2, h / 2, Math.min(w, h) * 0.3, 0, Math.PI * 2, 0);
+
+            const lg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            drawLines(lg, mmState.treeData);
+            svg.appendChild(lg);
+
+            const ng = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            drawNodes(ng, mmState.treeData);
+            svg.appendChild(ng);
+
+            canvas.appendChild(svg);
+        }
+
+        function layoutRadial(node, cx, cy, radius, sa, ea, depth) {
+            node.x = cx; node.y = cy; node.depth = depth;
+            if (!node.children || !node.children.length) return;
+            const step = (ea - sa) / node.children.length;
+            const cr = depth === 0 ? radius : radius * 0.72;
+            node.children.forEach((c, i) => {
+                const a = sa + step * (i + 0.5);
+                layoutRadial(c, cx + Math.cos(a) * cr, cy + Math.sin(a) * cr, cr * 0.65, a - step * 0.45, a + step * 0.45, depth + 1);
+            });
+        }
+
+        function drawLines(g, node) {
+            if (!node.children) return;
+            node.children.forEach((c, i) => {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const mx = (node.x + c.x) / 2, my = (node.y + c.y) / 2;
+                const cx2 = mx + (c.y - node.y) * 0.15, cy2 = my - (c.x - node.x) * 0.15;
+                p.setAttribute('d', `M${node.x},${node.y} Q${cx2},${cy2} ${c.x},${c.y}`);
+                p.setAttribute('class', 'mm-line');
+                p.style.animationDelay = `${i * 0.07}s`;
+                if (c.depth >= 2) { p.setAttribute('stroke-dasharray', '6 4'); p.style.opacity = '0.35'; }
+                g.appendChild(p);
+                drawLines(g, c);
+            });
+        }
+
+        function drawNodes(g, node) {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            el.style.animation = `nodeAppear 0.4s ease forwards`;
+            el.style.animationDelay = `${node.depth * 0.1}s`;
+            el.style.opacity = '0';
+            el.style.cursor = 'pointer';
+
+            const isRoot = node.depth === 0;
+            const r = isRoot ? 42 : (node.depth === 1 ? 34 : 26);
+            const fs = isRoot ? 13 : (node.depth === 1 ? 11 : 10);
+            const colors = [
+                { bg: '#EEF2FF', stroke: '#6366F1', text: '#312E81' },
+                { bg: '#F0F9FF', stroke: '#38BDF8', text: '#0C4A6E' },
+                { bg: '#F8FAFC', stroke: '#CBD5E1', text: '#475569' },
+                { bg: '#FEFCE8', stroke: '#FDE047', text: '#713F12' },
+            ];
+            const c = colors[Math.min(node.depth, 3)];
+            const selected = mmState.selectedId === node.id;
+
+            const ell = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+            ell.setAttribute('cx', node.x); ell.setAttribute('cy', node.y);
+            ell.setAttribute('rx', r); ell.setAttribute('ry', r * 0.78);
+            ell.setAttribute('fill', c.bg);
+            ell.setAttribute('stroke', selected ? '#3B82F6' : c.stroke);
+            ell.setAttribute('stroke-width', selected ? '2.5' : (isRoot ? '2' : '1.5'));
+            el.appendChild(ell);
+
+            const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            txt.setAttribute('x', node.x); txt.setAttribute('y', node.y);
+            txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('dominant-baseline', 'middle');
+            txt.setAttribute('font-size', fs); txt.setAttribute('font-weight', isRoot ? '700' : '500');
+            txt.setAttribute('fill', c.text); txt.style.pointerEvents = 'none';
+
+            const maxC = Math.floor(r / (fs * 0.3));
+            if (node.text.length > maxC) {
+                const t1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                t1.setAttribute('x', node.x); t1.setAttribute('dy', '-0.4em');
+                t1.textContent = node.text.slice(0, maxC);
+                const t2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                t2.setAttribute('x', node.x); t2.setAttribute('dy', '1.2em');
+                t2.textContent = node.text.slice(maxC, maxC * 2);
+                txt.appendChild(t1); txt.appendChild(t2);
+            } else {
+                txt.textContent = node.text;
+            }
+            el.appendChild(txt);
+
+            el.addEventListener('click', (e) => { e.stopPropagation(); selectMmNode(node.id); });
+            el.addEventListener('dblclick', (e) => { e.stopPropagation(); startInlineEdit(node); });
+
+            g.appendChild(el);
+            if (node.children) node.children.forEach(ch => drawNodes(g, ch));
+        }
+
+        // ============================================
+        // === Mindmap: Selection & Editing ===
+        // ============================================
+        function selectMmNode(id) {
+            mmState.selectedId = id;
+            renderMindmap();
+            showToolbarAt(id);
+        }
+
+        function showToolbarAt(id) {
+            const node = findNode(mmState.treeData, id);
+            if (!node) return;
+            const toolbar = document.getElementById('mmToolbar');
+            const canvas = document.getElementById('mindmapCanvas');
+            const cr = canvas.getBoundingClientRect();
+            toolbar.classList.remove('hidden');
+            toolbar.style.left = `${cr.left + node.x - 48}px`;
+            toolbar.style.top = `${cr.top + node.y + 40}px`;
+        }
+
+        function hideToolbar() { document.getElementById('mmToolbar').classList.add('hidden'); }
+
+        function mmStartEdit() {
+            const node = findNode(mmState.treeData, mmState.selectedId);
+            if (node) startInlineEdit(node);
+        }
+        function mmAddChild() { if (mmState.selectedId) mmAddChildNode(mmState.selectedId); }
+        function mmDeleteNode() { if (mmState.selectedId) mmDeleteNodeById(mmState.selectedId); }
+
+        function startInlineEdit(node) {
+            hideToolbar();
+            const canvas = document.getElementById('mindmapCanvas');
+            const inp = document.createElement('input');
+            inp.type = 'text'; inp.value = node.text;
+            inp.className = 'inline-edit-input';
+            inp.style.position = 'absolute';
+            inp.style.left = `${node.x - 55}px`;
+            inp.style.top = `${node.y - 12}px`;
+            inp.style.width = '110px';
+            inp.style.zIndex = '300';
+
+            const finish = () => { mmRenameNodeById(node.id, inp.value); inp.remove(); };
+            inp.addEventListener('blur', finish);
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') finish();
+                if (e.key === 'Escape') { inp.remove(); renderMindmap(); }
+            });
+            canvas.appendChild(inp);
+            inp.focus(); inp.select();
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                    if (mmState.selectedId) { e.preventDefault(); mmDeleteNode(); }
+                }
+            }
+        });
+
+        // ============================================
+        // === Initialize ===
+        // ============================================
+        init();
+        window.addEventListener('resize', () => { if (mmState.treeData) renderMindmap(); });
+    </script>
+</body>
+
+</html>

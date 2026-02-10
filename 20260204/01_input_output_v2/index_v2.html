@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>이름 인사 프로그램 v2</title>
+    <!-- 2단계: 깔끔하게 '꾸미기' (CSS) -->
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            /* 글꼴 변경 */
+            display: flex;
+            /* 정렬을 위해 플렉스 박스 사용 */
+            flex-direction: column;
+            /* 세로로 나열 */
+            align-items: center;
+            /* 가로 중앙 정렬 */
+            justify-content: center;
+            /* 세로 중앙 정렬 */
+            height: 100vh;
+            /* 화면 전체 높이 사용 */
+            margin: 0;
+            background-color: #f4f7f6;
+            /* 연한 배경색 */
+        }
+
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            /* 둥근 테두리 */
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            /* 버튼 색상(초록) */
+            color: white;
+            /* 버튼 글자색 */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            /* 마우스 올렸을 때 손가락 모양 */
+        }
+
+        button:hover {
+            background-color: #45a049;
+            /* 버튼에 마우스 올렸을 때 더 진해짐 */
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 1단계: 화면의 구성 요소(입력창, 버튼) 만들기 -->
+    <h1>환영합니다!</h1>
+
+    <p>이름을 알려주세요:</p>
+    <!-- 사용자가 글자를 입력하는 상자 -->
+    <input type="text" id="nameInput" placeholder="여기에 이름을 입력">
+
+    <!-- 클릭할 수 있는 버튼 -->
+    <button id="helloBtn">인사하기</button>
+
+    <!-- 결과 메시지가 나타날 빈 공간 -->
+    <div id="result"></div>
+
+    <!-- 3단계: 동작하게 만드는 '기능' (JavaScript) -->
+    <script>
+        // 1. 버튼(helloBtn)을 찾아서 '클릭 이벤트'를 감시합니다.
+        document.getElementById("helloBtn").onclick = function () {
+
+            // 2. 입력창(nameInput)에 적힌 값을 가져옵니다.
+            var name = document.getElementById("nameInput").value;
+
+            // 3. 결과창(result)을 찾습니다.
+            var display = document.getElementById("result");
+
+            // 4. 이름을 입력했는지 확인하고 결과글을 보여줍니다.
+            if (name.length > 0) {
+                // 이름이 있을 때: "안녕하세요. {이름}님!"
+                display.innerText = "안녕하세요. " + name + "님!";
+            } else {
+                // 이름이 없을 때: 안내 문구
+                display.innerText = "이름을 먼저 적어주세요!";
+            }
+        };
+    </script>
+</body>
+
+</html>

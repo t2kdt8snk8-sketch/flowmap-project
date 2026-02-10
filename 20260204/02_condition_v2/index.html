@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>합격/불합격 판별기</title>
+    <!-- 2단계: 스타일링 (CSS) -->
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #eef2f3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        input {
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            width: 200px;
+            text-align: center;
+        }
+
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+            /* 부드러운 효과 */
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #result {
+            margin-top: 25px;
+            font-size: 22px;
+            font-weight: bold;
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 1단계: 화면 구성 (HTML) -->
+    <h1>합격/불합격 판별기</h1>
+
+    <p>본인의 점수를 입력해주세요 (0~100):</p>
+
+    <!-- 점수 입력창 (숫자 타입으로 지정) -->
+    <input type="number" id="scoreInput" placeholder="점수 입력">
+
+    <!-- 결과 확인 버튼 -->
+    <button id="checkBtn">결과 확인</button>
+
+    <!-- 결과가 나타날 공간 -->
+    <div id="result"></div>
+
+    <!-- 3단계: 조건문 기능 추가 (JavaScript) -->
+    <script>
+        document.getElementById("checkBtn").onclick = function () {
+            // --- [1. 입력] 사용자가 입력한 값을 가져오기 ---
+            var value = document.getElementById("scoreInput").value;
+            var resultArea = document.getElementById("result");
+
+            // --- [2. 처리] 로직에 따라 판단하기 ---
+            var message = "";
+            var color = "";
+
+            // 조건 1: 값이 비어있는지 확인
+            if (value === "") {
+                message = "점수를 숫자로 입력해주세요.";
+                color = "orange";
+            } else {
+                // 숫자로 변환해서 점수 비교
+                var score = Number(value);
+
+                if (score < 0 || score > 100) {
+                    // 조건 2: 0~100 범위를 벗어난 경우
+                    message = "0점에서 100점 사이의 점수를 입력해주세요.";
+                    color = "orange";
+                } else if (score >= 70) {
+                    // 조건 3: 70정 이상일 때
+                    message = "통과했어요! 축하합니다. 🎉";
+                    color = "green";
+                } else {
+                    // 조건 4: 70점 미만일 때
+                    message = "불합격입니다. 조금 더 힘내세요! 💪";
+                    color = "red";
+                }
+            }
+
+            // --- [3. 출력] 화면에 결과 보여주기 ---
+            resultArea.innerText = message;
+            resultArea.style.color = color;
+            resultArea.style.backgroundColor = "white"; // 가독성을 위해 배경색 추가
+            resultArea.style.border = "2px solid " + color;
+        };
+    </script>
+</body>
+
+</html>
