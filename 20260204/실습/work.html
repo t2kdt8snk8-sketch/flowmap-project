@@ -646,6 +646,98 @@
             color: #DC2626;
         }
 
+        /* === Drag-to-Reparent === */
+        .mm-drag-line {
+            pointer-events: none;
+        }
+
+        .mm-drop-highlight {
+            filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) !important;
+        }
+
+        svg.mm-dragging {
+            cursor: grabbing;
+        }
+
+        /* === AI Suggestion Styles === */
+        .ai-expansion {
+            padding: 6px 0 2px 12px;
+            border-left: 2px solid #E5E7EB;
+            margin-top: 4px;
+            animation: fadeSlideUp 0.5s ease forwards;
+            opacity: 0;
+        }
+
+        .ai-expansion-item {
+            font-size: 11px;
+            color: #9CA3AF;
+            font-style: italic;
+            line-height: 1.6;
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+        }
+
+        .ai-expansion-item .ai-icon {
+            font-size: 8px;
+            color: #D1D5DB;
+            margin-top: 3px;
+            flex-shrink: 0;
+        }
+
+        .ai-connection-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #CBD5E1;
+            margin: 2px auto;
+            animation: fadeSlideUp 0.4s ease forwards;
+            opacity: 0;
+        }
+
+        .ai-connection-label {
+            font-size: 9px;
+            color: #CBD5E1;
+            text-align: center;
+            font-style: italic;
+            animation: fadeSlideUp 0.5s ease forwards;
+            opacity: 0;
+        }
+
+        .ai-loading-dots {
+            display: flex;
+            gap: 3px;
+            padding: 4px 12px;
+        }
+
+        .ai-loading-dots span {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #D1D5DB;
+            animation: dotPulse 1.2s ease-in-out infinite;
+        }
+
+        .ai-loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .ai-loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes fadeSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         @media (max-width: 768px) {
             .thinking-board {
                 padding: 70px 16px 24px;
@@ -739,6 +831,14 @@
         const stepIdeas = {};      // stepIndex -> [{ text, id }]
         let ideaIdCounter = 1;
         const stepBraindumps = {};  // kept for organize compat
+
+        // AI hint state
+        const aiExpansions = {};    // ideaId -> [string] (AI suggested expansion points)
+        const aiConnections = {};  // stepIndex -> [{from: ideaId, to: ideaId, reason: string}]
+        const aiPendingIds = new Set(); // idea IDs currently being processed
+
+        // Drag-to-reparent state
+        let mmDragState = null;    // { nodeId, startSvgX, startSvgY }
 
         // ============================================
         // === Init & Auth (unchanged) ===
@@ -982,7 +1082,30 @@
                                 <span class="hint-text">Enter ↵</span>
                             </div>
                             <div class="idea-chips-area" id="ideaChips">
-                                ${ideas.map(idea => `<div class="idea-chip">${escapeHtml(idea.text)}</div>`).join('')}
+                                ${ideas.map((idea, i) => {
+                let chipHtml = `<div class="idea-chip" data-idea-id="${idea.id}">${escapeHtml(idea.text)}`;
+                // AI expansion suggestions for question-type ideas
+                if (aiExpansions[idea.id] && aiExpansions[idea.id].length > 0) {
+                    chipHtml += `<div class="ai-expansion">`;
+                    aiExpansions[idea.id].forEach(s => {
+                        chipHtml += `<div class="ai-expansion-item"><span class="ai-icon">✦</span>${escapeHtml(s)}</div>`;
+                    });
+                    chipHtml += `</div>`;
+                } else if (aiPendingIds.has(idea.id)) {
+                    chipHtml += `<div class="ai-loading-dots"><span></span><span></span><span></span></div>`;
+                }
+                chipHtml += `</div>`;
+                // AI connection dot between related ideas
+                const conns = aiConnections[index] || [];
+                const nextIdea = ideas[i + 1];
+                if (nextIdea) {
+                    const conn = conns.find(c => (c.from === idea.id && c.to === nextIdea.id) || (c.from === nextIdea.id && c.to === idea.id));
+                    if (conn) {
+                        chipHtml += `<div class="ai-connection-dot"></div><div class="ai-connection-label">${escapeHtml(conn.reason)}</div>`;
+                    }
+                }
+                return chipHtml;
+            }).join('')}
                             </div>
                             ${showHint ? `
                             <div class="ai-hint-dot" onclick="handleOrganize(${index})" title="AI가 생각을 구조화합니다">
@@ -1033,13 +1156,25 @@
 
         function addIdeaChip(stepIndex, text) {
             if (!stepIdeas[stepIndex]) stepIdeas[stepIndex] = [];
-            stepIdeas[stepIndex].push({ text, id: ideaIdCounter++ });
+            const newId = ideaIdCounter++;
+            stepIdeas[stepIndex].push({ text, id: newId });
 
             // Also sync to braindumps for organize compat
             stepBraindumps[stepIndex] = stepIdeas[stepIndex].map(i => '- ' + i.text).join('\n');
 
             // Re-render to update chips + possibly show AI hint
             renderDetail(stepIndex);
+
+            // AI Feature: Question expansion
+            if (text.trim().endsWith('?')) {
+                triggerQuestionExpansion(stepIndex, newId, text);
+            }
+
+            // AI Feature: Semantic connections (when 2+ ideas)
+            const ideas = stepIdeas[stepIndex];
+            if (ideas.length >= 2) {
+                triggerSemanticConnection(stepIndex, ideas);
+            }
         }
 
         // ============================================
@@ -1295,8 +1430,22 @@ JSON만 반환:
                     g.appendChild(badge);
                 }
 
+                // Drag-to-reparent: mousedown
+                if (!isCenter) {
+                    g.addEventListener('mousedown', (e) => {
+                        if (e.button !== 0) return;
+                        e.stopPropagation();
+                        const svgRect = svg.getBoundingClientRect();
+                        const vbW = svg.viewBox.baseVal.width, vbH = svg.viewBox.baseVal.height;
+                        const svgX = ((e.clientX - svgRect.left) / svgRect.width) * vbW;
+                        const svgY = ((e.clientY - svgRect.top) / svgRect.height) * vbH;
+                        mmDragState = { nodeId: node.id, startSvgX: svgX, startSvgY: svgY, hasMoved: false };
+                    });
+                }
+
                 // Click → show contextual popup
                 g.addEventListener('click', (e) => {
+                    if (mmDragState && mmDragState.hasMoved) { mmDragState = null; return; }
                     e.stopPropagation();
                     mmSelectedId = node.id;
                     renderEditableMindmap();
@@ -1310,6 +1459,64 @@ JSON만 반환:
 
             svg.appendChild(linesG);
             svg.appendChild(nodesG);
+
+            // Drag-to-reparent: mousemove & mouseup on SVG
+            svg.addEventListener('mousemove', (e) => {
+                if (!mmDragState) return;
+                const svgRect = svg.getBoundingClientRect();
+                const vbW = svg.viewBox.baseVal.width, vbH = svg.viewBox.baseVal.height;
+                const svgX = ((e.clientX - svgRect.left) / svgRect.width) * vbW;
+                const svgY = ((e.clientY - svgRect.top) / svgRect.height) * vbH;
+                const dx = svgX - mmDragState.startSvgX;
+                const dy = svgY - mmDragState.startSvgY;
+                if (Math.abs(dx) > 8 || Math.abs(dy) > 8) mmDragState.hasMoved = true;
+                if (!mmDragState.hasMoved) return;
+                svg.classList.add('mm-dragging');
+                // Draw temporary drag line
+                let dragLine = svg.querySelector('.mm-drag-line');
+                if (!dragLine) {
+                    dragLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    dragLine.classList.add('mm-drag-line');
+                    dragLine.setAttribute('stroke', '#3B82F6');
+                    dragLine.setAttribute('stroke-width', '2');
+                    dragLine.setAttribute('stroke-dasharray', '8 4');
+                    dragLine.setAttribute('opacity', '0.6');
+                    svg.appendChild(dragLine);
+                }
+                const fromPos = pos[mmDragState.nodeId];
+                if (fromPos) {
+                    dragLine.setAttribute('x1', fromPos.x);
+                    dragLine.setAttribute('y1', fromPos.y);
+                    dragLine.setAttribute('x2', svgX);
+                    dragLine.setAttribute('y2', svgY);
+                }
+                // Highlight nearest drop target
+                highlightDropTarget(svg, nodesG, mmDragState.nodeId, svgX, svgY, pos);
+            });
+
+            svg.addEventListener('mouseup', (e) => {
+                if (!mmDragState || !mmDragState.hasMoved) { mmDragState = null; return; }
+                svg.classList.remove('mm-dragging');
+                const svgRect = svg.getBoundingClientRect();
+                const vbW = svg.viewBox.baseVal.width, vbH = svg.viewBox.baseVal.height;
+                const svgX = ((e.clientX - svgRect.left) / svgRect.width) * vbW;
+                const svgY = ((e.clientY - svgRect.top) / svgRect.height) * vbH;
+                const newParentId = findDropTarget(mmDragState.nodeId, svgX, svgY, pos);
+                if (newParentId !== null) {
+                    reparentNode(mmDragState.nodeId, newParentId);
+                }
+                mmDragState = null;
+                renderEditableMindmap();
+            });
+
+            svg.addEventListener('mouseleave', () => {
+                if (mmDragState) {
+                    mmDragState = null;
+                    svg.classList.remove('mm-dragging');
+                    renderEditableMindmap();
+                }
+            });
+
             container.innerHTML = '';
             container.appendChild(svg);
         }
@@ -1431,13 +1638,15 @@ JSON만 반환:
 
         function mmAddChild() {
             if (mmSelectedId === null) return;
-            const newText = prompt('새 항목 내용:');
-            if (newText && newText.trim()) {
-                const id = mmIdCounter++;
-                mmNodes.push({ id, text: newText.trim(), parentId: mmSelectedId, isDraft: false });
-                saveMmState();
-                renderDetail(currentDetailIdx);
-            }
+            dismissMmPopup();
+            // Create temporary node and immediately open inline edit
+            const id = mmIdCounter++;
+            mmNodes.push({ id, text: '새 항목', parentId: mmSelectedId, isDraft: false });
+            saveMmState();
+            mmSelectedId = id;
+            renderEditableMindmap();
+            // Trigger inline edit on the new node
+            setTimeout(() => mmEditSelected(), 100);
         }
 
         function mmAddBranch() {
@@ -1538,6 +1747,148 @@ JSON만 반환:
             path.style.strokeDashoffset = '600';
             path.style.animation = `drawLine 0.7s ease ${delay}s forwards`;
             group.appendChild(path);
+        }
+
+        // ============================================
+        // === Drag-to-Reparent Utilities ===
+        // ============================================
+        function highlightDropTarget(svg, nodesG, dragNodeId, svgX, svgY, pos) {
+            // Remove previous highlights
+            svg.querySelectorAll('.mm-drop-highlight').forEach(el => el.classList.remove('mm-drop-highlight'));
+            const targetId = findDropTarget(dragNodeId, svgX, svgY, pos);
+            if (targetId !== null) {
+                const nodeGs = nodesG.querySelectorAll('.mindmap-node-g');
+                const targetIdx = mmNodes.findIndex(n => n.id === targetId);
+                if (targetIdx >= 0 && nodeGs[targetIdx]) {
+                    nodeGs[targetIdx].classList.add('mm-drop-highlight');
+                }
+            }
+        }
+
+        function findDropTarget(dragNodeId, svgX, svgY, pos) {
+            const dragNode = mmNodes.find(n => n.id === dragNodeId);
+            if (!dragNode) return null;
+            let closest = null, closestDist = Infinity;
+            for (const n of mmNodes) {
+                if (n.id === dragNodeId) continue;
+                // Prevent dropping onto own children (cycle)
+                if (isDescendant(dragNodeId, n.id)) continue;
+                const p = pos[n.id];
+                if (!p) continue;
+                const d = Math.sqrt((svgX - p.x) ** 2 + (svgY - p.y) ** 2);
+                if (d < p.r + 30 && d < closestDist) {
+                    closest = n.id;
+                    closestDist = d;
+                }
+            }
+            return closest;
+        }
+
+        function isDescendant(ancestorId, nodeId) {
+            let current = mmNodes.find(n => n.id === nodeId);
+            while (current) {
+                if (current.id === ancestorId) return true;
+                if (!current.parentId) return false;
+                current = mmNodes.find(n => n.id === current.parentId);
+            }
+            return false;
+        }
+
+        function reparentNode(nodeId, newParentId) {
+            const node = mmNodes.find(n => n.id === nodeId);
+            if (!node || !newParentId) return;
+            if (node.parentId === newParentId) return;
+            // Prevent leaf→center depth > 3
+            const center = mmNodes.find(n => !n.parentId);
+            let depth = 0;
+            let p = mmNodes.find(n => n.id === newParentId);
+            while (p && p.parentId) { depth++; p = mmNodes.find(n => n.id === p.parentId); }
+            if (depth >= 2) return; // max 3 levels
+            node.parentId = newParentId;
+            saveMmState();
+        }
+
+        // ============================================
+        // === AI Hint System ===
+        // ============================================
+        async function triggerQuestionExpansion(stepIndex, ideaId, questionText) {
+            aiPendingIds.add(ideaId);
+            renderDetail(stepIndex);
+            try {
+                const prompt = `사용자가 사고 보드에 질문을 적었습니다: "${questionText}"
+
+이 질문에 대해 사용자가 더 깊이 생각할 수 있도록 도와주세요.
+규칙:
+- 1~2개의 짧은 생각 포인트 또는 관점 확장 질문을 제안
+- 각 항목은 최대 25자 이내
+- 답을 직접 주지 말고, 사고를 자극하는 방향으로
+- 한국어로 작성
+
+JSON만 반환: { "suggestions": ["포인트1", "포인트2"] }`;
+
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                if (!response.ok) throw new Error('AI Error');
+                const data = await response.json();
+                const raw = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const result = JSON.parse(raw);
+                if (result.suggestions && result.suggestions.length > 0) {
+                    aiExpansions[ideaId] = result.suggestions.slice(0, 2);
+                }
+            } catch (e) {
+                console.warn('AI question expansion failed:', e);
+                // Fallback: generate simple prompt
+                aiExpansions[ideaId] = ['다른 관점에서 바라본다면?', '구체적 사례가 있을까?'];
+            } finally {
+                aiPendingIds.delete(ideaId);
+                // Only re-render if we're still on the same step
+                if (currentDetailIdx === stepIndex) renderDetail(stepIndex);
+            }
+        }
+
+        async function triggerSemanticConnection(stepIndex, ideas) {
+            if (ideas.length < 2) return;
+            // Only check the last two ideas for performance
+            const recent = ideas.slice(-2);
+            const [a, b] = recent;
+            try {
+                const prompt = `두 아이디어 사이에 의미적 연결이 있는지 판단하세요:
+아이디어 A: "${a.text}"
+아이디어 B: "${b.text}"
+
+규칙:
+- 연결이 있다면, 그 관계를 최대 8자 이내의 한국어 키워드로 표현
+- 연결이 없다면 빈 문자열 반환
+- 관계 예시: "인과", "대비", "보완", "확장", "전제", "사례"
+
+JSON만 반환: { "connected": true/false, "reason": "키워드" }`;
+
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                if (!response.ok) throw new Error('AI Error');
+                const data = await response.json();
+                const raw = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const result = JSON.parse(raw);
+                if (result.connected && result.reason) {
+                    if (!aiConnections[stepIndex]) aiConnections[stepIndex] = [];
+                    // Avoid duplicate connections
+                    const exists = aiConnections[stepIndex].some(c =>
+                        (c.from === a.id && c.to === b.id) || (c.from === b.id && c.to === a.id)
+                    );
+                    if (!exists) {
+                        aiConnections[stepIndex].push({ from: a.id, to: b.id, reason: result.reason });
+                        if (currentDetailIdx === stepIndex) renderDetail(stepIndex);
+                    }
+                }
+            } catch (e) {
+                console.warn('AI semantic connection failed:', e);
+            }
         }
 
         // Initialize
