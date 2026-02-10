@@ -3,7 +3,16 @@
     "allow": [
       "WebSearch",
       "WebFetch(domain:arxiv.org)",
-      "WebFetch(domain:www.carlociccarelli.com)"
+      "WebFetch(domain:www.carlociccarelli.com)",
+      "Bash(brew list:*)",
+      "Bash(brew install:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(sudo cp:*)",
+      "Bash(chmod:*)",
+      "Bash(/usr/local/bin/gh --version)",
+      "Bash(export PATH=\"$HOME/bin:$PATH\")",
+      "Bash(gh auth:*)"
     ]
   }
 }

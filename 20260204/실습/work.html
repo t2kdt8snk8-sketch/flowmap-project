@@ -582,7 +582,7 @@
             background: rgba(255, 255, 255, 0.6);
             position: relative;
             overflow: hidden;
-            min-height: 460px;
+            min-height: 560px;
             backdrop-filter: blur(4px);
         }
 
@@ -759,7 +759,7 @@
     <main id="app" class="relative w-full flex flex-col items-center">
 
         <header class="fixed top-0 left-0 w-full px-10 py-10 flex justify-between items-start z-40 pointer-events-none">
-            <div class="text-sm font-bold tracking-tight text-[#111] pointer-events-auto">ARCHIVE.01</div>
+            <div class="text-sm font-bold tracking-tight text-[#111] pointer-events-auto"></div>
             <!-- Auth Status -->
             <div id="authStatus" class="pointer-events-auto text-xs font-medium text-gray-400 flex items-center gap-3">
                 <span id="authStatusText">Connected</span>
@@ -1283,6 +1283,19 @@ JSON만 반환:
         // ============================================
         // === Editable Mindmap Rendering ===
         // ============================================
+        // Auto-fit font size to circle: shrinks text when it's too long
+        function autoFitFontSize(text, radius, baseFontSize) {
+            const usable = radius * 1.6;
+            const avgCharW = baseFontSize * 0.58;
+            const lineH = baseFontSize * 1.35;
+            const charsPerLine = Math.max(1, Math.floor(usable / avgCharW));
+            const maxLines = Math.max(1, Math.floor(usable / lineH));
+            const capacity = charsPerLine * maxLines;
+            if (text.length <= capacity) return baseFontSize;
+            const ratio = Math.sqrt(capacity / text.length);
+            return Math.max(8, Math.round(baseFontSize * ratio));
+        }
+
         const MM_COLORS = [
             { main: '#3B82F6', border: '#93C5FD' },
             { main: '#10B981', border: '#6EE7B7' },
@@ -1310,7 +1323,11 @@ JSON만 반환:
             const container = document.getElementById('mmCanvas');
             if (!container || mmNodes.length === 0) return;
 
-            const W = 1200, H = 800;
+            const totalNodes = mmNodes.length;
+            // Dynamic scaling: fewer nodes = bigger, more nodes = smaller to fit screen
+            const scaleFactor = Math.max(0.55, Math.min(1.0, 1.15 - (totalNodes - 3) * 0.035));
+
+            const W = 1400, H = 900;
             const cx = W / 2, cy = H / 2;
             const NS = 'http://www.w3.org/2000/svg';
 
@@ -1318,23 +1335,29 @@ JSON만 반환:
             if (!center) return;
             const branches = mmNodes.filter(n => n.parentId === center.id);
             const nb = Math.max(branches.length, 1);
-            const R1 = Math.min(300, 150 + nb * 22);
-            const R2 = 170;
+
+            // Dynamic radii: large when few nodes, shrink as more are added
+            const centerR = Math.round(80 * scaleFactor);
+            const branchR = Math.round(65 * scaleFactor);
+            const leafR = Math.round(50 * scaleFactor);
+
+            const R1 = Math.round(Math.min(350 * scaleFactor, (180 + nb * 25) * scaleFactor));
+            const R2 = Math.round(200 * scaleFactor);
 
             // Position calculation
             const pos = {};
-            pos[center.id] = { x: cx, y: cy, r: 52 };
+            pos[center.id] = { x: cx, y: cy, r: centerR };
 
             branches.forEach((b, i) => {
                 const a = (2 * Math.PI * i / nb) - Math.PI / 2;
-                pos[b.id] = { x: cx + R1 * Math.cos(a), y: cy + R1 * Math.sin(a), r: 42 };
+                pos[b.id] = { x: cx + R1 * Math.cos(a), y: cy + R1 * Math.sin(a), r: branchR };
                 const leaves = mmNodes.filter(n => n.parentId === b.id);
                 const nl = leaves.length;
                 const maxSpread = (2 * Math.PI / nb) * 0.45;
                 const step = nl > 1 ? maxSpread / (nl - 1) : 0;
                 leaves.forEach((l, j) => {
                     const off = nl > 1 ? (j - (nl - 1) / 2) * step : 0;
-                    pos[l.id] = { x: pos[b.id].x + R2 * Math.cos(a + off), y: pos[b.id].y + R2 * Math.sin(a + off), r: 32 };
+                    pos[l.id] = { x: pos[b.id].x + R2 * Math.cos(a + off), y: pos[b.id].y + R2 * Math.sin(a + off), r: leafR };
                 });
             });
 
@@ -1411,7 +1434,9 @@ JSON만 반환:
                 fo.setAttribute('x', p.x - p.r); fo.setAttribute('y', p.y - p.r);
                 fo.setAttribute('width', p.r * 2); fo.setAttribute('height', p.r * 2);
                 const div = document.createElement('div');
-                div.style.cssText = `width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:${p.r * 0.15}px;font-size:${isCenter ? 14 : (isBranch ? 12 : 11)}px;font-weight:${isCenter ? 700 : (isBranch ? 600 : 400)};color:${isCenter ? '#FFF' : color.main};font-family:'Inter',sans-serif;line-height:1.3;word-break:keep-all;pointer-events:none;border-radius:50%;overflow:hidden;`;
+                const baseFontSize = isCenter ? 18 : (isBranch ? 15 : 13);
+                const fontSize = autoFitFontSize(node.text, p.r, baseFontSize);
+                div.style.cssText = `width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:${p.r * 0.15}px;font-size:${fontSize}px;font-weight:${isCenter ? 700 : (isBranch ? 600 : 400)};color:${isCenter ? '#FFF' : color.main};font-family:'Inter',sans-serif;line-height:1.3;word-break:keep-all;pointer-events:none;border-radius:50%;overflow:hidden;`;
                 div.textContent = node.text;
                 fo.appendChild(div);
 
