@@ -1,0 +1,317 @@
+{
+  "timestamp": "2026-03-19T06:56:43.213Z",
+  "reason": "compaction",
+  "status": {
+    "version": "2.0",
+    "lastUpdated": "2026-03-19T06:56:43.039Z",
+    "activeFeatures": [
+      "ai",
+      "insta-analyzer",
+      "store",
+      "synthesize",
+      "history"
+    ],
+    "primaryFeature": "ai",
+    "features": {
+      "ai": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-18T12:46:59.483Z",
+          "lastUpdated": "2026-03-18T13:11:29.793Z"
+        },
+        "lastFile": "/Users/minsoopark/Downloads/바이브코딩/insta-analyzer/src/lib/ai/provider.ts"
+      },
+      "insta-analyzer": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-18T13:15:14.817Z",
+          "lastUpdated": "2026-03-19T06:56:43.038Z"
+        },
+        "lastFile": "/Users/minsoopark/Downloads/바이브코딩/insta-analyzer/src/components/HeaderActions.tsx"
+      },
+      "store": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-18T13:18:35.390Z",
+          "lastUpdated": "2026-03-18T13:18:35.390Z"
+        },
+        "lastFile": "/Users/minsoopark/Downloads/바이브코딩/insta-analyzer/src/store/useAnalysisStore.ts"
+      },
+      "synthesize": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-19T06:35:03.234Z",
+          "lastUpdated": "2026-03-19T06:35:03.234Z"
+        },
+        "lastFile": "/Users/minsoopark/Downloads/바이브코딩/insta-analyzer/src/app/api/agent/synthesize/route.ts"
+      },
+      "history": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-03-19T06:56:08.681Z",
+          "lastUpdated": "2026-03-19T06:56:08.681Z"
+        },
+        "lastFile": "/Users/minsoopark/Downloads/바이브코딩/insta-analyzer/src/app/history/page.tsx"
+      }
+    },
+    "pipeline": {
+      "currentPhase": 1,
+      "level": "Dynamic",
+      "phaseHistory": []
+    },
+    "session": {
+      "startedAt": "2026-02-10T05:59:19.051Z",
+      "onboardingCompleted": false,
+      "lastActivity": "2026-03-19T06:56:43.039Z"
+    },
+    "history": [
+      {
+        "timestamp": "2026-03-18T12:46:59.483Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T12:59:01.931Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T12:59:10.368Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T12:59:17.500Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T12:59:32.213Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:02:39.162Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:02:48.090Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:02:55.249Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:03:05.636Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:03:17.658Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:03:26.976Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:03:44.810Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:10:28.903Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:10:37.501Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:10:41.845Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:10:46.802Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:10:50.147Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:11:11.924Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:11:29.793Z",
+        "feature": "ai",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:15:14.817Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:18:35.390Z",
+        "feature": "store",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:19:06.856Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:19:16.584Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:19:23.372Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:19:27.717Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-18T13:22:41.756Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:35:03.234Z",
+        "feature": "synthesize",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:35:17.027Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:35:25.309Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:48:58.349Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:49:08.044Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:49:12.623Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:52:33.010Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:52:47.981Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:56:08.681Z",
+        "feature": "history",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:56:20.502Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-03-19T06:56:43.039Z",
+        "feature": "insta-analyzer",
+        "phase": "do",
+        "action": "updated"
+      }
+    ]
+  }
+}

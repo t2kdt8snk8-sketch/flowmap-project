@@ -12,7 +12,14 @@
       "Bash(chmod:*)",
       "Bash(/usr/local/bin/gh --version)",
       "Bash(export PATH=\"$HOME/bin:$PATH\")",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(npx next:*)",
+      "Bash(npm install:*)",
+      "Bash(npm list:*)",
+      "Bash(lsof -ti:3000)",
+      "Bash(npx tsx:*)"
     ]
   }
 }
