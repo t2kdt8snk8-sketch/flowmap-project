@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Content Bot</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0f0f1a;
+    --surface:    #1e1e2e;
+    --surface2:   #16213e;
+    --border:     #334155;
+    --blue:       #2563eb;
+    --blue-dim:   rgba(37,99,235,0.25);
+    --green:      #22c55e;
+    --green-dim:  rgba(34,197,94,0.2);
+    --red:        #ef4444;
+    --red-dim:    rgba(239,68,68,0.15);
+    --text:       #f1f5f9;
+    --text-muted: #94a3b8;
+    --radius:     14px;
+    --radius-sm:  8px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── 로그인 화면 ─────────────────────────────── */
+  #login-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 24px;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 360px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 36px 28px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .login-logo {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .login-logo .symbol { font-size: 36px; display: block; margin-bottom: 8px; }
+  .login-logo h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .login-logo p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+  .login-input {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 15px;
+    padding: 13px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 12px;
+  }
+  .login-input:focus { border-color: var(--blue); }
+  .login-input::placeholder { color: var(--text-muted); }
+
+  .login-btn {
+    width: 100%;
+    background: var(--blue);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .login-btn:active { opacity: 0.85; transform: scale(0.98); }
+  .login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .login-error {
+    color: var(--red);
+    font-size: 13px;
+    text-align: center;
+    margin-top: 10px;
+    min-height: 18px;
+  }
+
+  /* ── 채팅 화면 ─────────────────────────────────── */
+  #chat-screen {
+    display: none;
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  /* 상단 바 */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+  .topbar-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .status-dot.connected { background: var(--green); }
+  .status-label { color: var(--text-muted); font-size: 12px; }
+  .logout-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+  }
+  .logout-btn:active { background: rgba(255,255,255,0.05); }
+
+  /* 메시지 스크롤 영역 */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 14px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 하단 입력 */
+  .input-bar {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .input-field {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text);
+    font-size: 15px;
+    padding: 10px 16px;
+    outline: none;
+    resize: none;
+    max-height: 120px;
+    line-height: 1.4;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  .input-field:focus { border-color: var(--blue); }
+  .input-field::placeholder { color: var(--text-muted); }
+  .input-field:disabled { opacity: 0.4; }
+  .send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--blue);
+    border: none;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .send-btn:active { opacity: 0.8; transform: scale(0.92); }
+  .send-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  /* ── 메시지 버블들 ───────────────────────────── */
+
+  /* 내 메시지 */
+  .msg-user {
+    align-self: flex-end;
+    background: var(--blue);
+    border-radius: 18px 18px 4px 18px;
+    padding: 10px 14px;
+    max-width: 82%;
+    word-break: break-word;
+    font-size: 15px;
+  }
+
+  /* 피드백 버블 */
+  .msg-feedback {
+    align-self: flex-end;
+    background: #374151;
+    border-radius: 18px 18px 4px 18px;
+    padding: 8px 14px;
+    max-width: 82%;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .msg-feedback::before { content: "💬 "; }
+
+  /* 에이전트 카드 공통 */
+  .agent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: slideUp 0.25s ease-out;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .card-icon { font-size: 18px; flex-shrink: 0; }
+  .card-title { font-weight: 600; font-size: 14px; flex: 1; }
+  .card-time { color: var(--text-muted); font-size: 12px; flex-shrink: 0; }
+  .card-status { font-size: 16px; flex-shrink: 0; }
+
+  /* 실행 중 펄스 */
+  .pulse {
+    display: inline-block;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  .card-body {
+    padding: 0 14px 12px;
+    color: var(--text-muted);
+    font-size: 14px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .card-content {
+    padding: 12px 0 4px;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .card-content.collapsed {
+    max-height: 120px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 60%, transparent 100%);
+  }
+
+  .expand-btn {
+    background: none;
+    border: none;
+    color: var(--blue);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 0 8px;
+    display: block;
+  }
+
+  /* Opus 플랜 카드 */
+  .plan-card {
+    background: var(--surface2);
+    border-color: var(--blue-dim);
+  }
+  .plan-steps {
+    padding: 4px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .plan-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .plan-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* 완료 카드 */
+  .card-completed { border-color: var(--green-dim); }
+  .card-error     { border-color: var(--red-dim); }
+
+  /* 액션 버튼들 */
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px 14px 12px;
+  }
+  .btn {
+    flex: 1;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+  .btn-primary:active { background: #1d4ed8; }
+
+  /* 인라인 피드백 입력 */
+  .feedback-input-area {
+    padding: 0 14px 12px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    animation: slideUp 0.2s ease-out;
+  }
+  .feedback-input-area.open { display: flex; }
+  .feedback-textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 14px;
+    padding: 10px 12px;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    line-height: 1.4;
+    min-height: 72px;
+  }
+  .feedback-textarea:focus { border-color: var(--blue); }
+  .feedback-row { display: flex; gap: 8px; }
+
+  /* 최종 결과 카드 */
+  .final-card {
+    background: var(--surface);
+    border: 1px solid var(--green-dim);
+  }
+  .final-content {
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  /* 마크다운 기본 스타일 */
+  .final-content h1, .final-content h2, .final-content h3 {
+    font-weight: 700;
+    margin: 12px 0 6px;
+    color: var(--text);
+  }
+  .final-content h1 { font-size: 17px; }
+  .final-content h2 { font-size: 16px; }
+  .final-content h3 { font-size: 15px; }
+  .final-content p { margin-bottom: 8px; }
+  .final-content ul, .final-content ol {
+    padding-left: 18px;
+    margin-bottom: 8px;
+  }
+  .final-content li { margin-bottom: 4px; }
+  .final-content strong { color: #e2e8f0; font-weight: 600; }
+  .final-content em { color: #cbd5e1; font-style: italic; }
+  .final-content code {
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .final-content pre {
+    background: rgba(0,0,0,0.3);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+  }
+  .final-content hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px 0;
+  }
+
+  /* 빈 상태 */
+  .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 48px 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .empty-state .big { font-size: 40px; }
+  .empty-state h2 { font-size: 17px; font-weight: 600; color: var(--text); }
+  .empty-state p { font-size: 14px; max-width: 260px; }
+  .example-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: var(--text-muted);
+  }
+  .chip:active { background: var(--surface2); }
+</style>
+</head>
+<body>
+
+<!-- ── 로그인 화면 ──────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="symbol">✦</span>
+      <h1>Content Bot</h1>
+      <p>AI 콘텐츠 자동화 도구</p>
+    </div>
+    <input
+      class="login-input"
+      id="pw-input"
+      type="password"
+      placeholder="비밀번호 입력"
+      autocomplete="current-password"
+    />
+    <button class="login-btn" id="login-btn" onclick="doLogin()">입장하기</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── 채팅 화면 ─────────────────────────────────────── -->
+<div id="chat-screen">
+  <div class="topbar">
+    <div class="topbar-title">
+      <span>✦</span>
+      <span>Content Bot</span>
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-label" id="status-label">연결 중...</span>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">로그아웃</button>
+  </div>
+
+  <div id="messages">
+    <div class="empty-state" id="empty-state">
+      <span class="big">✦</span>
+      <h2>무엇을 만들까요?</h2>
+      <p>요청을 보내면 AI 에이전트들이 단계별로 작업해요</p>
+      <div class="example-chips">
+        <span class="chip" onclick="setInput(this)">neo-soul 인스타 캐러셀 만들어줘</span>
+        <span class="chip" onclick="setInput(this)">K-힙합 유튜브 스크립트 써줘</span>
+        <span class="chip" onclick="setInput(this)">재즈 앨범 커버 이미지 프롬프트</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-bar">
+    <div class="input-row">
+      <textarea
+        class="input-field"
+        id="main-input"
+        placeholder="요청 입력..."
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()">▶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 상태 ──────────────────────────────────────────────────────────────────────
+let token = null;
+let ws = null;
+let isRunning = false;
+let reconnectTimer = null;
+
+const AGENT_EMOJI = {
+  research_agent:     '🔍',
+  copy_agent:         '✍️',
+  image_prompt_agent: '🎨',
+  script_agent:       '🎬',
+  format_agent:       '✅',
+};
+const AGENT_LABEL = {
+  research_agent:     'Research',
+  copy_agent:         'Copy',
+  image_prompt_agent: 'Image Prompts',
+  script_agent:       'Script',
+  format_agent:       'Format',
+};
+
+// ── 초기화 ────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  token = localStorage.getItem('ca_token');
+  if (token) verifyAndEnter();
+  else showLogin();
+
+  document.getElementById('pw-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('chat-screen').style.display  = 'none';
+  setTimeout(() => document.getElementById('pw-input').focus(), 100);
+}
+
+function showChat() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('chat-screen').style.display  = 'flex';
+  connectWS();
+}
+
+async function verifyAndEnter() {
+  try {
+    const r = await fetch('/api/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (r.ok) showChat();
+    else { localStorage.removeItem('ca_token'); token = null; showLogin(); }
+  } catch { showLogin(); }
+}
+
+// ── 인증 ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const pw = document.getElementById('pw-input').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  if (!pw) return;
+  btn.disabled = true; btn.textContent = '...';
+  err.textContent = '';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      token = data.token;
+      localStorage.setItem('ca_token', token);
+      showChat();
+    } else {
+      err.textContent = data.error || '비밀번호가 틀렸어요';
+    }
+  } catch { err.textContent = '서버에 연결할 수 없어요'; }
+  finally { btn.disabled = false; btn.textContent = '입장하기'; }
+}
+
+async function doLogout() {
+  await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+  localStorage.removeItem('ca_token');
+  token = null;
+  if (ws) ws.close();
+  document.getElementById('messages').innerHTML = `
+    <div class="empty-state" id="empty-state">
+      <span class="big">✦</span>
+      <h2>무엇을 만들까요?</h2>
+      <p>요청을 보내면 AI 에이전트들이 단계별로 작업해요</p>
+      <div class="example-chips">
+        <span class="chip" onclick="setInput(this)">neo-soul 인스타 캐러셀 만들어줘</span>
+        <span class="chip" onclick="setInput(this)">K-힙합 유튜브 스크립트 써줘</span>
+        <span class="chip" onclick="setInput(this)">재즈 앨범 커버 이미지 프롬프트</span>
+      </div>
+    </div>`;
+  showLogin();
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connectWS() {
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws?token=${token}`);
+
+  ws.onopen = () => {
+    setStatus(true);
+  };
+
+  ws.onmessage = e => {
+    const data = JSON.parse(e.data);
+    handleEvent(data);
+  };
+
+  ws.onclose = e => {
+    setStatus(false);
+    if (e.code === 4001) { doLogout(); return; }
+    // 3초 후 자동 재연결
+    reconnectTimer = setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => setStatus(false);
+}
+
+function setStatus(connected) {
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  dot.classList.toggle('connected', connected);
+  lbl.textContent = connected ? '연결됨' : '재연결 중...';
+}
+
+function wsSend(data) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+}
+
+// ── 이벤트 핸들러 ─────────────────────────────────────────────────────────────
+function handleEvent(data) {
+  switch (data.type) {
+
+    case 'plan_step':
+      appendPlanCard(data.agents);
+      break;
+
+    case 'agent_started':
+      appendAgentCard(data.agent);
+      break;
+
+    case 'agent_completed':
+      updateAgentCard(data.agent, data.content, data.error, data.elapsed_ms);
+      break;
+
+    case 'workflow_completed':
+      appendFinalCard(data.final_output, data.total_ms);
+      setRunning(false);
+      break;
+
+    case 'workflow_failed':
+      appendErrorCard(data.error);
+      setRunning(false);
+      break;
+
+    case 'workflow_cancelled':
+      appendSystemMsg('취소됐어요');
+      setRunning(false);
+      break;
+
+    case 'error':
+      appendSystemMsg(data.error, true);
+      break;
+  }
+}
+
+// ── 메시지 전송 ───────────────────────────────────────────────────────────────
+function sendMessage() {
+  const input = document.getElementById('main-input');
+  const msg = input.value.trim();
+  if (!msg || isRunning) return;
+
+  hideEmpty();
+  appendUserBubble(msg);
+  input.value = '';
+  autoResize(input);
+  setRunning(true);
+  wsSend({ type: 'run_workflow', message: msg });
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function setInput(el) {
+  document.getElementById('main-input').value = el.textContent;
+  document.getElementById('main-input').focus();
+}
+
+function setRunning(running) {
+  isRunning = running;
+  document.getElementById('send-btn').disabled = running;
+  document.getElementById('main-input').disabled = running;
+  document.getElementById('main-input').placeholder = running
+    ? '실행 중...'
+    : '요청 입력...';
+}
+
+// ── DOM 헬퍼 ──────────────────────────────────────────────────────────────────
+function hideEmpty() {
+  const el = document.getElementById('empty-state');
+  if (el) el.remove();
+}
+
+function scrollToBottom() {
+  const msgs = document.getElementById('messages');
+  setTimeout(() => msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' }), 50);
+}
+
+function appendUserBubble(text) {
+  const msgs = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.className = 'msg-user';
+  el.textContent = text;
+  msgs.appendChild(el);
+  scrollToBottom();
+}
+
+function appendSystemMsg(text, isError = false) {
+  const msgs = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.style.cssText = `text-align:center;font-size:13px;color:${isError ? 'var(--red)' : 'var(--text-muted)'};padding:8px;`;
+  el.textContent = text;
+  msgs.appendChild(el);
+  scrollToBottom();
+}
+
+// ── Opus 플랜 카드 ────────────────────────────────────────────────────────────
+function appendPlanCard(agents) {
+  const msgs = document.getElementById('messages');
+  const steps = agents.map((a, i) => `
+    <div class="plan-step">
+      <div class="plan-step-num">${i+1}</div>
+      <span>${AGENT_EMOJI[a] || '🤖'} ${AGENT_LABEL[a] || a}</span>
+    </div>`).join('');
+
+  const el = document.createElement('div');
+  el.className = 'agent-card plan-card';
+  el.id = 'plan-card';
+  el.innerHTML = `
+    <div class="card-header">
+      <span class="card-icon">📋</span>
+      <span class="card-title">Opus 플랜</span>
+    </div>
+    <div class="plan-steps">${steps}</div>
+    <div class="card-actions" id="plan-actions">
+      <button class="btn" onclick="sendFeedbackToServer('plan', null, this)">💬 수정 요청</button>
+      <button class="btn btn-primary" onclick="approve('plan-actions')">시작하기 ▶</button>
+    </div>
+    <div class="feedback-input-area" id="feedback-plan">
+      <textarea class="feedback-textarea" placeholder="어떻게 바꿔드릴까요?"></textarea>
+      <div class="feedback-row">
+        <button class="btn" onclick="closeFeedback('feedback-plan')">취소</button>
+        <button class="btn btn-primary" onclick="submitFeedback('feedback-plan', 'plan-actions')">보내고 재계획 ▶</button>
+      </div>
+    </div>`;
+  msgs.appendChild(el);
+  scrollToBottom();
+}
+
+// ── 에이전트 카드 (실행 중) ───────────────────────────────────────────────────
+function appendAgentCard(agentName) {
+  const msgs = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.className = 'agent-card';
+  el.id = `card-${agentName}`;
+  el.innerHTML = `
+    <div class="card-header">
+      <span class="card-icon">${AGENT_EMOJI[agentName] || '🤖'}</span>
+      <span class="card-title">${AGENT_LABEL[agentName] || agentName}</span>
+      <span class="card-status"><span class="pulse">⏳</span></span>
+    </div>`;
+  msgs.appendChild(el);
+  scrollToBottom();
+}
+
+// ── 에이전트 카드 (완료) ──────────────────────────────────────────────────────
+function updateAgentCard(agentName, content, error, elapsedMs) {
+  const el = document.getElementById(`card-${agentName}`);
+  if (!el) return;
+
+  const isError = !!error;
+  el.classList.add(isError ? 'card-error' : 'card-completed');
+
+  const timeLabel = elapsedMs ? `${(elapsedMs/1000).toFixed(1)}s` : '';
+  const statusIcon = isError ? '❌' : '✅';
+  const bodyText = isError ? error : (content || '');
+  const isLong = bodyText.length > 300;
+  const contentId = `content-${agentName}`;
+  const actionsId = `actions-${agentName}`;
+  const feedbackId = `feedback-${agentName}`;
+
+  el.innerHTML = `
+    <div class="card-header">
+      <span class="card-icon">${AGENT_EMOJI[agentName] || '🤖'}</span>
+      <span class="card-title">${AGENT_LABEL[agentName] || agentName}</span>
+      <span class="card-time">${timeLabel}</span>
+      <span class="card-status">${statusIcon}</span>
+    </div>
+    <div class="card-body">
+      <div class="card-content ${isLong ? 'collapsed' : ''}" id="${contentId}">${escHtml(bodyText)}</div>
+      ${isLong ? `<button class="expand-btn" onclick="toggleExpand('${contentId}', this)">▼ 전체 보기</button>` : ''}
+      ${!isError ? `
+      <div class="card-actions" id="${actionsId}">
+        <button class="btn" onclick="openFeedback('${feedbackId}')">💬 피드백</button>
+        <button class="btn btn-primary" onclick="approve('${actionsId}')">계속 ▶</button>
+      </div>
+      <div class="feedback-input-area" id="${feedbackId}">
+        <textarea class="feedback-textarea" placeholder="이 결과에 대한 피드백을 입력하세요..."></textarea>
+        <div class="feedback-row">
+          <button class="btn" onclick="closeFeedback('${feedbackId}')">취소</button>
+          <button class="btn btn-primary" onclick="submitFeedback('${feedbackId}', '${actionsId}')">보내고 계속 ▶</button>
+        </div>
+      </div>` : `
+      <div style="padding:8px 0 4px;">
+        <button class="btn" style="max-width:160px;" onclick="approve(null)">계속 ▶</button>
+      </div>`}
+    </div>`;
+  scrollToBottom();
+}
+
+// ── 최종 결과 카드 ────────────────────────────────────────────────────────────
+function appendFinalCard(output, totalMs) {
+  const msgs = document.getElementById('messages');
+  const timeLabel = totalMs ? ` · ${(totalMs/1000).toFixed(0)}s` : '';
+  const el = document.createElement('div');
+  el.className = 'agent-card final-card';
+  el.innerHTML = `
+    <div class="card-header">
+      <span class="card-icon">🎉</span>
+      <span class="card-title">완성됐어요${timeLabel}</span>
+    </div>
+    <div class="final-content">${renderMarkdown(output || '')}</div>
+    <div class="card-actions">
+      <button class="btn" onclick="copyResult(this)">📋 복사</button>
+      <button class="btn" onclick="newChat()">🔄 새 요청</button>
+    </div>`;
+  msgs.appendChild(el);
+  scrollToBottom();
+}
+
+function appendErrorCard(errMsg) {
+  const msgs = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.className = 'agent-card card-error';
+  el.innerHTML = `
+    <div class="card-header">
+      <span class="card-icon">❌</span>
+      <span class="card-title">오류가 발생했어요</span>
+    </div>
+    <div class="card-body">
+      <div class="card-content">${escHtml(errMsg)}</div>
+    </div>`;
+  msgs.appendChild(el);
+  scrollToBottom();
+}
+
+// ── 승인 / 피드백 ─────────────────────────────────────────────────────────────
+function approve(actionsId) {
+  if (actionsId) {
+    const el = document.getElementById(actionsId);
+    if (el) el.style.display = 'none';
+  }
+  wsSend({ type: 'approve' });
+}
+
+function openFeedback(feedbackId) {
+  const el = document.getElementById(feedbackId);
+  if (el) {
+    el.classList.add('open');
+    el.querySelector('.feedback-textarea').focus();
+  }
+}
+
+function closeFeedback(feedbackId) {
+  const el = document.getElementById(feedbackId);
+  if (el) el.classList.remove('open');
+}
+
+function submitFeedback(feedbackId, actionsId) {
+  const area = document.getElementById(feedbackId);
+  const msg = area.querySelector('.feedback-textarea').value.trim();
+  if (!msg) return;
+
+  // 피드백 버블 추가
+  const msgs = document.getElementById('messages');
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-feedback';
+  bubble.textContent = msg;
+  msgs.appendChild(bubble);
+
+  // 입력창 닫기
+  area.classList.remove('open');
+  area.querySelector('.feedback-textarea').value = '';
+  if (actionsId) {
+    const actEl = document.getElementById(actionsId);
+    if (actEl) actEl.style.display = 'none';
+  }
+
+  wsSend({ type: 'feedback', message: msg });
+  scrollToBottom();
+}
+
+// plan 카드의 수정 요청 (조금 다른 흐름)
+function sendFeedbackToServer(type, agentName, btn) {
+  const planCard = document.getElementById('plan-card');
+  const feedbackArea = document.getElementById('feedback-plan');
+  if (feedbackArea) feedbackArea.classList.add('open');
+  if (feedbackArea) feedbackArea.querySelector('.feedback-textarea').focus();
+}
+
+// ── 기타 UI 헬퍼 ──────────────────────────────────────────────────────────────
+function toggleExpand(contentId, btn) {
+  const el = document.getElementById(contentId);
+  if (el.classList.contains('collapsed')) {
+    el.classList.remove('collapsed');
+    btn.textContent = '▲ 접기';
+  } else {
+    el.classList.add('collapsed');
+    btn.textContent = '▼ 전체 보기';
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+async function copyResult(btn) {
+  const card = btn.closest('.final-card');
+  const content = card.querySelector('.final-content');
+  const text = content.innerText;
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '✅ 복사됨';
+    setTimeout(() => btn.textContent = '📋 복사', 2000);
+  } catch { btn.textContent = '복사 실패'; }
+}
+
+function newChat() {
+  document.getElementById('messages').innerHTML = `
+    <div class="empty-state" id="empty-state">
+      <span class="big">✦</span>
+      <h2>무엇을 만들까요?</h2>
+      <p>요청을 보내면 AI 에이전트들이 단계별로 작업해요</p>
+      <div class="example-chips">
+        <span class="chip" onclick="setInput(this)">neo-soul 인스타 캐러셀 만들어줘</span>
+        <span class="chip" onclick="setInput(this)">K-힙합 유튜브 스크립트 써줘</span>
+        <span class="chip" onclick="setInput(this)">재즈 앨범 커버 이미지 프롬프트</span>
+      </div>
+    </div>`;
+  setRunning(false);
+  document.getElementById('main-input').focus();
+}
+
+// ── 마크다운 간단 렌더러 ──────────────────────────────────────────────────────
+function renderMarkdown(text) {
+  let html = escHtml(text);
+  // 코드 블록
+  html = html.replace(/```[\s\S]*?```/g, m => `<pre><code>${m.slice(3, -3)}</code></pre>`);
+  // 인라인 코드
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // 헤딩
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+  // 볼드/이탤릭
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g,     '<em>$1</em>');
+  // HR
+  html = html.replace(/^---$/gm, '<hr>');
+  // 줄바꿈
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
